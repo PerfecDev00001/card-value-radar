@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Dashboard } from '@/pages/Dashboard';
+import { Search } from '@/pages/Search';
 
 export function MainApp() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -11,12 +12,7 @@ export function MainApp() {
       case 'dashboard':
         return <Dashboard onTabChange={setActiveTab} />;
       case 'search':
-        return (
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold mb-4">Search Module</h2>
-            <p className="text-muted-foreground">Coming soon...</p>
-          </div>
-        );
+        return <Search />;
       case 'results':
         return (
           <div className="text-center py-12">
