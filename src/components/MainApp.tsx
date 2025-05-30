@@ -3,6 +3,9 @@ import { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Dashboard } from '@/pages/Dashboard';
 import { Search } from '@/pages/Search';
+import { Results } from '@/pages/Results';
+import { Alerts } from '@/pages/Alerts';
+import { Trends } from '@/pages/Trends';
 
 export function MainApp() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -14,26 +17,11 @@ export function MainApp() {
       case 'search':
         return <Search />;
       case 'results':
-        return (
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold mb-4">Search Results</h2>
-            <p className="text-muted-foreground">Coming soon...</p>
-          </div>
-        );
+        return <Results />;
       case 'alerts':
-        return (
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold mb-4">Price Alerts</h2>
-            <p className="text-muted-foreground">Coming soon...</p>
-          </div>
-        );
+        return <Alerts />;
       case 'trends':
-        return (
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold mb-4">Price Trends</h2>
-            <p className="text-muted-foreground">Coming soon...</p>
-          </div>
-        );
+        return <Trends />;
       case 'exports':
         return (
           <div className="text-center py-12">
