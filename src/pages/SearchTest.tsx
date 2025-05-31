@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { MultiSelect } from '@/components/ui/multi-select';
+import { CustomMultiSelect } from '@/components/ui/custom-multi-select';
 import { useToast } from '@/hooks/use-toast';
 import { Search as SearchIcon, ExternalLink } from 'lucide-react';
 
@@ -183,7 +183,7 @@ export function SearchTest() {
             {/* Marketplace Selection */}
             <div className="space-y-2">
               <Label>Marketplaces</Label>
-              <MultiSelect
+              <CustomMultiSelect
                 options={marketplaceOptions}
                 selected={selectedMarketplaces}
                 onChange={setSelectedMarketplaces}
