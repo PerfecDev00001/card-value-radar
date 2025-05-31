@@ -12,7 +12,8 @@ import {
   Store,
   Brain,
   LogOut,
-  Home
+  Home,
+  Shield
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -30,6 +31,7 @@ const navItems = [
   { id: 'marketplaces', label: 'Marketplaces', icon: Store },
   { id: 'ai-estimator', label: 'AI Estimator', icon: Brain },
   { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'admin', label: 'Admin Panel', icon: Shield },
 ];
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {

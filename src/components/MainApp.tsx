@@ -6,6 +6,10 @@ import { Search } from '@/pages/Search';
 import { Results } from '@/pages/Results';
 import { Alerts } from '@/pages/Alerts';
 import { Trends } from '@/pages/Trends';
+import { Exports } from '@/pages/Exports';
+import { Marketplaces } from '@/pages/Marketplaces';
+import { Settings } from '@/pages/Settings';
+import { Admin } from '@/pages/Admin';
 
 export function MainApp() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -23,19 +27,9 @@ export function MainApp() {
       case 'trends':
         return <Trends />;
       case 'exports':
-        return (
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold mb-4">Data Exports</h2>
-            <p className="text-muted-foreground">Coming soon...</p>
-          </div>
-        );
+        return <Exports />;
       case 'marketplaces':
-        return (
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold mb-4">Marketplaces</h2>
-            <p className="text-muted-foreground">Coming soon...</p>
-          </div>
-        );
+        return <Marketplaces />;
       case 'ai-estimator':
         return (
           <div className="text-center py-12">
@@ -44,12 +38,9 @@ export function MainApp() {
           </div>
         );
       case 'settings':
-        return (
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold mb-4">Settings</h2>
-            <p className="text-muted-foreground">Coming soon...</p>
-          </div>
-        );
+        return <Settings />;
+      case 'admin':
+        return <Admin />;
       default:
         return <Dashboard onTabChange={setActiveTab} />;
     }
