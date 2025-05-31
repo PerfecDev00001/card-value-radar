@@ -7,16 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { CustomMultiSelect } from '@/components/ui/custom-multi-select';
 import { useToast } from '@/hooks/use-toast';
 import { Search as SearchIcon, ExternalLink } from 'lucide-react';
-
-interface SearchResult {
-  id: string;
-  market: string;
-  card: string;
-  price: number;
-  image: string;
-  url: string;
-  difference: number; // percentage difference from average
-}
+import { cardSearchAPI, type SearchResult } from '@/services/api';
 
 export function SearchTest() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -59,59 +50,17 @@ export function SearchTest() {
     setLoading(true);
     
     try {
-      // Simulate API call and scraping
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock results for demonstration
-      const mockResults: SearchResult[] = [
-        {
-          id: '1',
-          market: 'eBay',
-          card: '2021 Topps Chrome Patrick Mahomes PSA 10',
-          price: 299.99,
-          image: 'https://via.placeholder.com/100x140?text=Card',
-          url: 'https://www.ebay.com/itm/123456789',
-          difference: 5.2
-        },
-        {
-          id: '2',
-          market: 'CardsHQ',
-          card: '2021 Topps Chrome Patrick Mahomes PSA 10',
-          price: 285.00,
-          image: 'https://via.placeholder.com/100x140?text=Card',
-          url: 'https://www.cardshq.com/card/123456',
-          difference: -2.8
-        },
-        {
-          id: '3',
-          market: 'MySlabs',
-          card: '2021 Topps Chrome Patrick Mahomes PSA 10',
-          price: 310.50,
-          image: 'https://via.placeholder.com/100x140?text=Card',
-          url: 'https://www.myslabs.com/card/789012',
-          difference: 8.9
-        },
-        {
-          id: '4',
-          market: 'eBay',
-          card: '2021 Topps Chrome Patrick Mahomes PSA 9',
-          price: 189.99,
-          image: 'https://via.placeholder.com/100x140?text=Card',
-          url: 'https://www.ebay.com/itm/987654321',
-          difference: -1.5
-        }
-      ];
+      // Use the API service to search for cards
+      const searchResults = await cardSearchAPI.searchCards({
+        searchTerm,
+        marketplaces: selectedMarketplaces
+      });
 
-      // Filter results based on selected marketplaces
-      const filteredResults = mockResults.filter(result => 
-        selectedMarketplaces.includes(result.market.toLowerCase().replace(/\s+/g, ''))
-      );
-
-      setResults(filteredResults);
+      setResults(searchResults);
       
       toast({
         title: "Search completed!",
-        description: `Found ${filteredResults.length} results for "${searchTerm}"`,
+        description: `Found ${searchResults.length} results for "${searchTerm}"`,
       });
     } catch (error) {
       toast({
@@ -153,7 +102,7 @@ export function SearchTest() {
 
       {/* Search Section */}
       <div className="flex justify-center">
-        <Card className="w-full max-w-2xl">
+        <Card className="w-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 justify-center">
               <SearchIcon className="h-5 w-5" />
