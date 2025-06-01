@@ -22,12 +22,6 @@ export function SearchTest() {
     { label: 'MySlabs', value: 'myslabs' }
   ];
 
-  const marketplaceUrls = {
-    ebay: 'https://www.ebay.com/',
-    cardshq: 'https://www.cardshq.com/',
-    myslabs: 'https://www.myslabs.com'
-  };
-
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
       toast({
@@ -51,7 +45,7 @@ export function SearchTest() {
     
     try {
       // Use the API service to search for cards
-      const searchResults = await cardSearchAPI.searchCards({
+      const searchResults = await cardSearchAPI.searchCardsWitheBayAPI({
         searchTerm,
         marketplaces: selectedMarketplaces
       });
