@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CustomMultiSelect } from '@/components/ui/custom-multi-select';
 import { useToast } from '@/hooks/use-toast';
-import { Search as SearchIcon, ExternalLink, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Search as SearchIcon, ExternalLink, ChevronLeft, ChevronRight, Filter, Loader2 } from 'lucide-react';
 import { cardSearchAPI, type SearchResult } from '@/services/api';
 
 export function SearchTest() {
@@ -53,6 +53,14 @@ export function SearchTest() {
     }
 
     setLoading(true);
+    // Clear old data immediately when starting new search
+    setResults([]);
+    // Reset filters and pagination
+    setMarketFilter([]);
+    setCardFilter('');
+    setMinPrice('');
+    setMaxPrice('');
+    setCurrentPage(1);
     
     try {
       // Use the API service to search for cards
@@ -62,7 +70,6 @@ export function SearchTest() {
       });
 
       setResults(searchResults);
-      setCurrentPage(1); // Reset to first page on new search
       
       toast({
         title: "Search completed!",
@@ -150,20 +157,13 @@ export function SearchTest() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Search Section */}
-      <div className="flex justify-center">
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 justify-center">
-              <SearchIcon className="h-5 w-5" />
-              Card Search
-            </CardTitle>
-            <CardDescription className="text-center">
-              Enter search terms and select marketplaces to search
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+    <div className="flex justify-center">
+      <Card className="w-full">
+        <CardHeader>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Search Section */}
+          <div className="space-y-4">
             {/* Labels Row */}
             <div className="flex gap-4">
               <div className="w-[50%]">
@@ -216,238 +216,251 @@ export function SearchTest() {
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
 
-      {/* Results Section */}
-      {results.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Search Results</span>
-              <div className="text-sm font-normal text-muted-foreground">
-                Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredResults.length)} of {filteredResults.length} results
-                {filteredResults.length !== results.length && ` (filtered from ${results.length} total)`}
+          {/* Results Section */}
+          {results.length > 0 && (
+            <div className="space-y-4">
+              {/* Results Header */}
+              <div className="border-t pt-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-lg font-semibold">Search Results</h3>
+                  <div className="text-sm text-muted-foreground">
+                    Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredResults.length)} of {filteredResults.length} results
+                    {filteredResults.length !== results.length && ` (filtered from ${results.length} total)`}
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Found {results.length} results across selected marketplaces
+                </p>
               </div>
-            </CardTitle>
-            <CardDescription>
-              Found {results.length} results across selected marketplaces
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Filters Section */}
-            <div className="border rounded-lg p-4 bg-muted/50">
-              <div className="flex items-center gap-2 mb-3">
-                <Filter className="h-4 w-4" />
-                <Label className="text-sm font-medium">Filters</Label>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={clearFilters}
-                  className="ml-auto text-xs"
-                >
-                  Clear All
-                </Button>
+
+              {/* Filters Section */}
+              <div className="border rounded-lg p-4 bg-muted/50">
+                <div className="flex items-center gap-2 mb-3">
+                  <Filter className="h-4 w-4" />
+                  <Label className="text-sm font-medium">Filters</Label>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={clearFilters}
+                    className="ml-auto text-xs"
+                  >
+                    Clear All
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Market Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs">Market</Label>
+                    <CustomMultiSelect
+                      options={availableMarkets}
+                      selected={marketFilter}
+                      onChange={setMarketFilter}
+                      placeholder="All markets"
+                    />
+                  </div>
+                  
+                  {/* Card Name Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs">Card Name</Label>
+                    <Input
+                      placeholder="Filter by card name..."
+                      value={cardFilter}
+                      onChange={(e) => setCardFilter(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  
+                  {/* Min Price Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs">Min Price ($)</Label>
+                    <Input
+                      type="number"
+                      placeholder="0.00"
+                      value={minPrice}
+                      onChange={(e) => setMinPrice(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  
+                  {/* Max Price Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs">Max Price ($)</Label>
+                    <Input
+                      type="number"
+                      placeholder="999999.99"
+                      value={maxPrice}
+                      onChange={(e) => setMaxPrice(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                </div>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {/* Market Filter */}
-                <div className="space-y-2">
-                  <Label className="text-xs">Market</Label>
-                  <CustomMultiSelect
-                    options={availableMarkets}
-                    selected={marketFilter}
-                    onChange={setMarketFilter}
-                    placeholder="All markets"
-                  />
+
+              {/* Table */}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Market</TableHead>
+                    <TableHead>Card</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Image</TableHead>
+                    <TableHead>URL</TableHead>
+                    <TableHead>Difference</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedResults.map((result) => (
+                    <TableRow key={result.id}>
+                      <TableCell className="font-medium">
+                        {result.market}
+                      </TableCell>
+                      <TableCell className="max-w-xs">
+                        <div className="truncate" title={result.card}>
+                          {result.card}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-semibold">
+                        {formatPrice(result.price)}
+                      </TableCell>
+                      <TableCell>
+                        <img 
+                          src={result.image} 
+                          alt={result.card}
+                          className="w-16 h-20 object-cover rounded border"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = 'https://via.placeholder.com/100x140?text=No+Image';
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          asChild
+                        >
+                          <a 
+                            href={result.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            View
+                          </a>
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <span className={getDifferenceColor(result.difference)}>
+                          {formatDifference(result.difference)}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm">Items per page:</Label>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="border rounded px-2 py-1 text-sm"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Previous
+                    </Button>
+                    
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handlePageChange(pageNum)}
+                            className="w-8 h-8 p-0"
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                
-                {/* Card Name Filter */}
+              )}
+            </div>
+          )}
+
+          {/* Loading Spinner */}
+          {loading && (
+            <div className="text-center py-12 border-t">
+              <div className="flex flex-col items-center gap-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 <div className="space-y-2">
-                  <Label className="text-xs">Card Name</Label>
-                  <Input
-                    placeholder="Filter by card name..."
-                    value={cardFilter}
-                    onChange={(e) => setCardFilter(e.target.value)}
-                    className="h-9"
-                  />
-                </div>
-                
-                {/* Min Price Filter */}
-                <div className="space-y-2">
-                  <Label className="text-xs">Min Price ($)</Label>
-                  <Input
-                    type="number"
-                    placeholder="0.00"
-                    value={minPrice}
-                    onChange={(e) => setMinPrice(e.target.value)}
-                    className="h-9"
-                  />
-                </div>
-                
-                {/* Max Price Filter */}
-                <div className="space-y-2">
-                  <Label className="text-xs">Max Price ($)</Label>
-                  <Input
-                    type="number"
-                    placeholder="999999.99"
-                    value={maxPrice}
-                    onChange={(e) => setMaxPrice(e.target.value)}
-                    className="h-9"
-                  />
+                  <p className="text-lg font-medium">Searching for cards...</p>
+                  <p className="text-sm text-muted-foreground">
+                    Please wait while we search across selected marketplaces
+                  </p>
                 </div>
               </div>
             </div>
+          )}
 
-            {/* Table */}
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Market</TableHead>
-                  <TableHead>Card</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Image</TableHead>
-                  <TableHead>URL</TableHead>
-                  <TableHead>Difference</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedResults.map((result) => (
-                  <TableRow key={result.id}>
-                    <TableCell className="font-medium">
-                      {result.market}
-                    </TableCell>
-                    <TableCell className="max-w-xs">
-                      <div className="truncate" title={result.card}>
-                        {result.card}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-semibold">
-                      {formatPrice(result.price)}
-                    </TableCell>
-                    <TableCell>
-                      <img 
-                        src={result.image} 
-                        alt={result.card}
-                        className="w-16 h-20 object-cover rounded border"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = 'https://via.placeholder.com/100x140?text=No+Image';
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        asChild
-                      >
-                        <a 
-                          href={result.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          View
-                        </a>
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      <span className={getDifferenceColor(result.difference)}>
-                        {formatDifference(result.difference)}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm">Items per page:</Label>
-                  <select
-                    value={itemsPerPage}
-                    onChange={(e) => {
-                      setItemsPerPage(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="border rounded px-2 py-1 text-sm"
-                  >
-                    <option value={5}>5</option>
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                  </select>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Previous
-                  </Button>
-                  
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      let pageNum;
-                      if (totalPages <= 5) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i;
-                      } else {
-                        pageNum = currentPage - 2 + i;
-                      }
-                      
-                      return (
-                        <Button
-                          key={pageNum}
-                          variant={currentPage === pageNum ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => handlePageChange(pageNum)}
-                          className="w-8 h-8 p-0"
-                        >
-                          {pageNum}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* No Results Message */}
-      {!loading && results.length === 0 && searchTerm && (
-        <Card>
-          <CardContent className="text-center py-12">
-            <p className="text-muted-foreground">
-              No results found. Try adjusting your search terms or selecting different marketplaces.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+          {/* No Results Message */}
+          {!loading && results.length === 0 && searchTerm && (
+            <div className="text-center py-12 border-t">
+              <p className="text-muted-foreground">
+                No results found. Try adjusting your search terms or selecting different marketplaces.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
