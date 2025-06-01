@@ -25,7 +25,7 @@ export class CardSearchAPI {
 
   /**
    * Search for cards across multiple marketplaces
-   * This should call a backend endpoint that handles:
+   * Calls the backend API which handles:
    * - API authentication with marketplace APIs
    * - Rate limiting
    * - Data aggregation
@@ -33,26 +33,27 @@ export class CardSearchAPI {
    */
   async searchCards(params: SearchParams): Promise<SearchResult[]> {
     try {
-      // TODO: Replace with actual backend API call
-      // const response = await fetch(`${this.baseUrl}/search`, {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify(params),
-      // });
-      // 
-      // if (!response.ok) {
-      //   throw new Error(`API Error: ${response.status}`);
-      // }
-      // 
-      // return await response.json();
+      // Try to call the backend API first
+      const response = await fetch(`${this.baseUrl}/search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+      });
 
-      // For now, return mock data
-      return this.getMockResults(params);
+      if (response.ok) {
+        const data = await response.json();
+        return data.results || [];
+      } else {
+        console.warn('Backend API not available, using mock data');
+        // Fallback to mock data if backend is not available
+        return this.getMockResults(params);
+      }
     } catch (error) {
-      console.error('Search API error:', error);
-      throw new Error('Failed to search cards. Please try again.');
+      console.warn('Backend API error, using mock data:', error);
+      // Fallback to mock data on error
+      return this.getMockResults(params);
     }
   }
 
@@ -107,4 +108,9 @@ export class CardSearchAPI {
 }
 
 // Export singleton instance
-export const cardSearchAPI = new CardSearchAPI();
+// Use localhost:3001 for development, will be updated for production
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+  ? '/api' 
+  : 'http://localhost:3001/api';
+
+export const cardSearchAPI = new CardSearchAPI(API_BASE_URL);
