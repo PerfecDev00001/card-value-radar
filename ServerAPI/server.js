@@ -101,7 +101,6 @@ async function scrapingForCardsHQ(searchTerm){
   }
 
   const totalPages = Math.ceil(totalCount / itemsPerPage);
-  console.log(`Total count: ${totalCount}, Pages: ${totalPages}`);
   // Step 2: Loop through all pages to get card data
   for (let page = 1; page <= totalPages; page++) {
     const url = `${pageBase}search?q=${searchTerm}&page=${page}`;

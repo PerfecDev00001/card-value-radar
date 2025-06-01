@@ -33,7 +33,6 @@ export class CardSearchAPI {
    */
   async searchCardsWitheBayAPI(params: SearchParams): Promise<SearchResult[]> {
     try {
-      console.log('marketPlace', params);
       // Try to call the backend API first
       const response = await fetch(`${this.baseUrl}/search`, {
         method: 'POST',
@@ -45,7 +44,6 @@ export class CardSearchAPI {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('result',data.results, 'length', data.results.length);
         return data.results || [];
       } else {
         console.warn('Backend API not available, using mock data');

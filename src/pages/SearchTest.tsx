@@ -87,13 +87,6 @@ export function SearchTest() {
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight">Search Test</h1>
-        <p className="text-muted-foreground mt-2">
-          Test search functionality across multiple marketplaces
-        </p>
-      </div>
-
       {/* Search Section */}
       <div className="flex justify-center">
         <Card className="w-full">
@@ -107,42 +100,58 @@ export function SearchTest() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Search Input */}
-            <div className="space-y-2">
-              <Label htmlFor="searchTerm">Search Term</Label>
-              <Input
-                id="searchTerm"
-                placeholder="e.g., 2021 Topps Chrome Patrick Mahomes PSA 10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSearch();
-                  }
-                }}
-              />
+            {/* Labels Row */}
+            <div className="flex gap-4">
+              <div className="w-[50%]">
+                <Label htmlFor="searchTerm">Search Term</Label>
+              </div>
+              <div className="w-[40%]">
+                <Label>Marketplaces</Label>
+              </div>
+              <div className="w-[10%]">
+                {/* Empty space for button alignment */}
+              </div>
             </div>
 
-            {/* Marketplace Selection */}
-            <div className="space-y-2">
-              <Label>Marketplaces</Label>
-              <CustomMultiSelect
-                options={marketplaceOptions}
-                selected={selectedMarketplaces}
-                onChange={setSelectedMarketplaces}
-                placeholder="Select marketplaces to search..."
-              />
-            </div>
+            {/* Search Controls Row */}
+            <div className="flex gap-4 items-end">
+              {/* Search Input - 50% */}
+              <div className="w-[50%]">
+                <Input
+                  id="searchTerm"
+                  placeholder="e.g., 2021 Topps Chrome Patrick Mahomes PSA 10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSearch();
+                    }
+                  }}
+                />
+              </div>
 
-            {/* Search Button */}
-            <Button 
-              onClick={handleSearch} 
-              disabled={loading}
-              className="w-full"
-              size="lg"
-            >
-              {loading ? 'Searching...' : 'Search'}
-            </Button>
+              {/* Marketplace Selection - 40% */}
+              <div className="w-[40%]">
+                <CustomMultiSelect
+                  options={marketplaceOptions}
+                  selected={selectedMarketplaces}
+                  onChange={setSelectedMarketplaces}
+                  placeholder="Select marketplaces to search..."
+                />
+              </div>
+
+              {/* Search Button - 10% */}
+              <div className="w-[10%]">
+                <Button 
+                  onClick={handleSearch} 
+                  disabled={loading}
+                  className="w-full"
+                  size="lg"
+                >
+                  {loading ? 'Searching...' : 'Search'}
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
