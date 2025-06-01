@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Dashboard } from '@/pages/Dashboard';
 import { Search } from '@/pages/Search';
+import { SearchTest } from '@/pages/SearchTest';
 import { Results } from '@/pages/Results';
 import { Alerts } from '@/pages/Alerts';
 import { Trends } from '@/pages/Trends';
@@ -20,6 +21,8 @@ export function MainApp() {
         return <Dashboard onTabChange={setActiveTab} />;
       case 'search':
         return <Search />;
+      case 'search-test':
+        return <SearchTest />;
       case 'results':
         return <Results />;
       case 'alerts':

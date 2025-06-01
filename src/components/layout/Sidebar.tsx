@@ -13,7 +13,8 @@ import {
   Brain,
   LogOut,
   Home,
-  Shield
+  Shield,
+  TestTube
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -24,6 +25,7 @@ interface SidebarProps {
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
   { id: 'search', label: 'Search', icon: Search },
+  { id: 'search-test', label: 'Search Test', icon: TestTube },
   { id: 'results', label: 'Results', icon: BarChart3 },
   { id: 'alerts', label: 'Alerts', icon: Bell },
   { id: 'trends', label: 'Price Trends', icon: TrendingUp },
