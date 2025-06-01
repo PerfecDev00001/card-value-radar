@@ -52,22 +52,12 @@ async function getEbayAccessToken() {
 async function searchEbayCards(searchTerm) {
   try {
     const token = await getEbayAccessToken();
-    
-    const response = await axios.get(
-      `${EBAY_BASE_URL}/buy/browse/v1/item_summary/search`,
-      {
-        params: {
-          q: searchTerm,
-          category_ids: '213', // Sports Trading Cards category
-          limit: 20,
-          sort: 'price'
-        },
-        headers: {
-          'Authorization': `Bearer ${token}`,
+    const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(searchTerm)}`;
+    const headers = {
+      'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
-      }
-    );
+    }
+    const response = await axios.get(url, { headers });
 
     const items = response.data.itemSummaries || [];
     
@@ -90,7 +80,6 @@ async function searchEbayCards(searchTerm) {
 app.post('/api/search', async (req, res) => {
   try {
     const { searchTerm, marketplaces } = req.body;
-
     if (!searchTerm || !marketplaces?.length) {
       return res.status(400).json({ error: 'Search term and marketplaces are required' });
     }

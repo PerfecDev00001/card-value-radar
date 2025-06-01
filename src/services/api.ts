@@ -31,8 +31,9 @@ export class CardSearchAPI {
    * - Data aggregation
    * - Price comparison calculations
    */
-  async searchCards(params: SearchParams): Promise<SearchResult[]> {
+  async searchCardsWitheBayAPI(params: SearchParams): Promise<SearchResult[]> {
     try {
+      console.log('marketPlace', params);
       // Try to call the backend API first
       const response = await fetch(`${this.baseUrl}/search`, {
         method: 'POST',
