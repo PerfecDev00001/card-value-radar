@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const cheerio = require('cheerio');
 require('dotenv').config();
 
 const app = express();
@@ -76,6 +77,60 @@ async function searchEbayCards(searchTerm) {
   }
 }
 
+async function scrapingForCardsHQ(searchTerm){
+  const pageBase = "https://www.cardshq.com/";
+  const itemsPerPage = 36;
+  // Step 1: Fetch first page to get total count
+  const firstUrl = `${pageBase}search?q=${searchTerm}&page=1`;
+  const { data: firstHtml } = await axios.get(firstUrl);
+  const $ = cheerio.load(firstHtml);
+  const CardShqRst= [];
+  // Extract total count text like "68 results"
+  let totalCount = 0;
+  $('div').each((i, el) => {
+    const text = $(el).text().trim();
+    const match = text.match(/^(\d+)\s+results$/);
+    if (match) {
+      totalCount = parseInt(match[1], 10);
+    }
+  });
+
+  if (totalCount === 0) {
+    console.log("Could not find result count.");
+    return;
+  }
+
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
+  console.log(`Total count: ${totalCount}, Pages: ${totalPages}`);
+  // Step 2: Loop through all pages to get card data
+  for (let page = 1; page <= totalPages; page++) {
+    const url = `${pageBase}search?q=${searchTerm}&page=${page}`;
+    const { data: html } = await axios.get(url);
+    const $ = cheerio.load(html);
+
+    $('.group.relative.flex.flex-col.w-full').each((index, element) => {
+      let str = $(element).find('a.relative.flex.h-full.w-full.justify-center').attr('href');
+      str = str.split('/');
+      const id = str[str.length - 1] || '';
+      const card = $(element).find('h2').text().trim();
+      const proxyUrl = $(element).find('img').attr('src')?.trim() || '';
+      const priceStr = $(element).find('p').text().trim();
+      const price = parseFloat(priceStr.replace(/[^0-9.]/g, ''));
+      const url = pageBase + $(element).find('a.relative.flex.h-full.w-full.justify-center').attr('href');
+      const market = 'CardsHQ';
+      const difference = 0.8; // Placeholder for difference calculation
+
+      var image = '';
+      const urlMatch = proxyUrl.match(/url=([^&]+)/);
+      if (urlMatch && urlMatch[1]) {
+        image = decodeURIComponent(urlMatch[1]);
+      }
+      CardShqRst.push({ id, market, card, price, image, url, difference });
+    });
+  }
+  return CardShqRst
+}
+
 // API Routes
 app.post('/api/search', async (req, res) => {
   try {
@@ -94,15 +149,8 @@ app.post('/api/search', async (req, res) => {
 
     // Add other marketplaces here (mock data for now)
     if (marketplaces.includes('cardshq')) {
-      results.push({
-        id: 'cardshq-1',
-        market: 'CardsHQ',
-        card: `${searchTerm} PSA 10`,
-        price: 285.00,
-        image: 'https://via.placeholder.com/100x140?text=Card',
-        url: 'https://www.cardshq.com/card/123456',
-        difference: -2.8
-      });
+      const cardShqResults = await scrapingForCardsHQ(searchTerm);
+      results.push(...cardShqResults);
     }
 
     if (marketplaces.includes('myslabs')) {

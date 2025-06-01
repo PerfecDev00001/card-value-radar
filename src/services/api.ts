@@ -45,6 +45,7 @@ export class CardSearchAPI {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('result',data.results, 'length', data.results.length);
         return data.results || [];
       } else {
         console.warn('Backend API not available, using mock data');
