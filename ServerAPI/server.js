@@ -24,11 +24,6 @@ let accessTokenCache = {
 
 // Get eBay access token
 async function getEbayAccessToken() {
-  // Check if we have a valid cached token
-  // if (accessTokenCache.token && Date.now() < accessTokenCache.expires) {
-  //   return accessTokenCache.token;
-  // }
-
   try {
     const credentials = Buffer.from(`${EBAY_CLIENT_ID}:${EBAY_CLIENT_SECRET}`).toString('base64');
     const response = await axios.post(
@@ -130,6 +125,92 @@ async function scrapingForCardsHQ(searchTerm){
   return CardShqRst
 }
 
+async function scrapingForCardsMySlabs(searchTerm){
+  const baseUrl = "https://www.myslabs.com";
+  const query = searchTerm;
+  const perPage = 72;
+  let results = [];
+
+  const axiosInstance = axios.create({
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+      'Accept-Language': 'en-US,en;q=0.9'
+    }
+  });
+
+  const delay = ms => new Promise(res => setTimeout(res, ms));
+
+  try {
+    // Fetch first page to determine total count
+    const firstUrl = `${baseUrl}/search/all/?publish_type=all&owner=&q=${encodeURIComponent(query)}&x=13&y=14&o=created_desc`;
+    console.log('Scraping URL:', firstUrl);
+
+    const { data: firstHtml } = await axiosInstance.get(firstUrl);
+    const $first = cheerio.load(firstHtml);
+
+    // Scrape items on the first page
+    $first('.slab_item').each((i, el) => {
+      const card = $first(el).find('.slab-title').text().trim();
+      let priceStr = $first(el).find('.item-price').text().trim();
+      const price = parseFloat(priceStr.replace(/[^0-9.]/g, ''));
+      const image = $first(el).find('.slab_item_img_inside img').attr('data-src')?.trim() ||
+          $first(el).find('.slab_item_img_inside img').attr('src')?.trim() || '';
+      let urlStr = $first(el).find('.text-decoration-none').attr('href')?.trim() || '';
+      const url = baseUrl + urlStr;
+      let idStr = urlStr.split('view');
+      const id = parseFloat(idStr[1].replace(/[^0-9.]/g, ''));
+      results.push({ id, market: 'MySlabs', card, price, image, url, difference: 0.8 });
+    });
+
+    // Extract total count
+    const countText = $first('a#pills-all-tab small').text().trim();
+    const countMatch = countText.match(/\(([\d,]+)\)/);
+    const totalCount = countMatch ? parseInt(countMatch[1].replace(/,/g, '')) : 0;
+    console.log('Total count:', totalCount);
+
+    // Calculate total pages
+    let totalPages = Math.ceil(totalCount / perPage);
+    totalPages = totalPages > 25 ? 25 : totalPages;  // Optional limit to 25 pages
+    console.log('Total pages:', totalPages);
+
+    // Loop through the remaining pages
+    for (let pageNum = 2; pageNum <= totalPages; pageNum++) {
+      const pageUrl = `${baseUrl}/search/all/?publish_type=all&q=${encodeURIComponent(query)}&o=created_desc&page=${pageNum}`;
+      console.log('Scraping URL:', pageUrl);
+
+      try {
+        const { data: html } = await axiosInstance.get(pageUrl);
+        const $ = cheerio.load(html);
+
+        $('.slab_item').each((i, el) => {
+          const card = $(el).find('.slab-title').text().trim();
+          let priceStr = $(el).find('.item-price').text().trim();
+          let price = parseFloat(priceStr.replace(/[^0-9.]/g, ''));
+          const image = $(el).find('.slab_item_img_inside img').attr('data-src')?.trim() ||
+              $(el).find('.slab_item_img_inside img').attr('src')?.trim() || '';
+          let urlStr = ($first(el).find('.text-decoration-none').attr('href')?.trim() || '');
+          const url = baseUrl + urlStr;
+          let idStr = urlStr.split('view');
+          const id = parseFloat(idStr[1].replace(/[^0-9.]/g, ''));
+          results.push({ id, market: 'MySlabs', card, price, image, url, difference: 0.8 });
+        });
+
+        await delay(1000); // Polite delay between requests
+      } catch (err) {
+        console.error(`Failed on page ${pageNum}:`, err.message);
+        break; // Optional: break on repeated failures
+      }
+    }
+
+    console.log('Scraped total count:', results.length);
+    console.log('Scraped total count:', results[results.length-1]);
+    // Optionally return or save the results
+    return results;
+
+  } catch (err) {
+    console.error('Initial scraping failed:', err.message);
+  }
+}
 // API Routes
 app.post('/api/search', async (req, res) => {
   try {
@@ -153,15 +234,8 @@ app.post('/api/search', async (req, res) => {
     }
 
     if (marketplaces.includes('myslabs')) {
-      results.push({
-        id: 'myslabs-1',
-        market: 'MySlabs',
-        card: `${searchTerm} PSA 10`,
-        price: 310.50,
-        image: 'https://via.placeholder.com/100x140?text=Card',
-        url: 'https://www.myslabs.com/card/789012',
-        difference: 8.9
-      });
+      const cardMySlabsResults = await scrapingForCardsMySlabs(searchTerm);
+      results.push(...cardMySlabsResults);
     }
 
     res.json({ results });
