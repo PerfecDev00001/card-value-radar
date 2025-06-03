@@ -9,7 +9,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start:all": "concurrently \"npm run dev\" \"npm start --prefix ServerAPI\""
+    "start:all": "concurrently \"npm run dev\" \"npm run dev --prefix ServerAPI\""
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
