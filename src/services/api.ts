@@ -110,7 +110,7 @@ export class CardSearchAPI {
 // Export singleton instance
 // Use localhost:3001 for development, will be updated for production
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'visionary-twilight-d0a36f.netlify.app:3008/api'
+  ? 'https://cardbackend.netlify.app/api'
   : 'http://localhost:3008/api';
 
 export const cardSearchAPI = new CardSearchAPI(API_BASE_URL);
