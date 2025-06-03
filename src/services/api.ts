@@ -101,16 +101,16 @@ export class CardSearchAPI {
     ];
 
     // Filter results based on selected marketplaces
-    return mockResults.filter(result => 
-      params.marketplaces.includes(result.market.toLowerCase().replace(/\s+/g, ''))
+    return mockResults.filter(result =>
+        params.marketplaces.includes(result.market.toLowerCase().replace(/\s+/g, ''))
     );
   }
 }
 
 // Export singleton instance
 // Use localhost:3001 for development, will be updated for production
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? '/api' 
-  : 'http://localhost:3001/api';
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+    ? 'https://cardbackend.netlify.app/api'
+    : 'http://localhost:3008/api';
 
 export const cardSearchAPI = new CardSearchAPI(API_BASE_URL);
