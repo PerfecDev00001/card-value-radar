@@ -110,7 +110,7 @@ export class CardSearchAPI {
 // Export singleton instance
 // Use localhost:3001 for development, will be updated for production
 const API_BASE_URL = process.env.NODE_ENV === 'production'
-    ? 'https://sportscardapi.onrender.com:10000/api'
-    : 'http://localhost:3008/api';
+    ? 'https://sportscardapi.onrender.com/api'
+    : 'http://localhost:3001/api';
 
 export const cardSearchAPI = new CardSearchAPI(API_BASE_URL);
