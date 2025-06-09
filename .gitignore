@@ -21,3 +21,4 @@ netlify.toml
 *.njsproj
 *.sln
 *.sw?
+ServerAPI

@@ -1,5 +1,5 @@
-
-import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,40 +21,56 @@ interface Marketplace {
 }
 
 export function Marketplaces() {
-  const [marketplaces, setMarketplaces] = useState<Marketplace[]>([
-    {
-      id: '1',
-      name: 'eBay',
-      url: 'https://ebay.com',
-      isActive: true,
-      lastSync: '2024-01-15 10:30 AM',
-      status: 'connected'
-    },
-    {
-      id: '2',
-      name: 'COMC',
-      url: 'https://comc.com',
-      isActive: true,
-      lastSync: '2024-01-15 10:25 AM',
-      status: 'connected'
-    },
-    {
-      id: '3',
-      name: '130 Point',
-      url: 'https://130point.com',
-      isActive: false,
-      lastSync: '2024-01-10 3:15 PM',
-      status: 'disconnected'
-    },
-    {
-      id: '4',
-      name: 'PWCC',
-      url: 'https://pwccmarketplace.com',
-      isActive: true,
-      lastSync: 'Never',
-      status: 'error'
-    }
-  ]);
+  const [marketplaces, setMarketplaces] = useState<Marketplace[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load marketplaces from Supabase when component mounts
+  useEffect(() => {
+    const fetchMarketplaces = async () => {
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from('marketplaces')
+          .select('*');
+          
+        if (error) {
+          throw error;
+        }
+        
+        if (data && data.length > 0) {
+          // Transform Supabase data to match our Marketplace interface
+          const transformedData: Marketplace[] = data.map(item => ({
+            id: item.id,
+            name: item.name,
+            url: item.base_url || '',
+            isActive: item.is_active || false,
+            apiKey: item.api_key || undefined,
+            lastSync: 'Never', // This would need to come from a separate table or calculation
+            status: item.is_active ? 'connected' : 'disconnected'
+          }));
+          
+          setMarketplaces(transformedData);
+        } else {
+          // If no data, set empty array - user can add marketplaces
+          setMarketplaces([]);
+        }
+      } catch (error) {
+        console.error('Error fetching marketplaces:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load marketplaces from database.",
+          variant: "destructive",
+        });
+        
+        // Set empty array on error
+        setMarketplaces([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchMarketplaces();
+  }, []);
 
   const [newMarketplace, setNewMarketplace] = useState({
     name: '',
@@ -64,7 +80,8 @@ export function Marketplaces() {
 
   const { toast } = useToast();
 
-  const handleToggleMarketplace = (id: string) => {
+  const handleToggleMarketplace = async (id: string) => {
+    // First update the UI state for immediate feedback
     setMarketplaces(prev => 
       prev.map(mp => 
         mp.id === id 
@@ -72,13 +89,50 @@ export function Marketplaces() {
           : mp
       )
     );
-    toast({
-      title: "Marketplace Updated",
-      description: "Marketplace status has been changed.",
-    });
+    
+    // Get the updated marketplace state
+    const updatedMarketplace = marketplaces.find(mp => mp.id === id);
+    if (!updatedMarketplace) return;
+    
+    // The new state is the opposite of the current state
+    const newActiveState = !updatedMarketplace.isActive;
+    
+    try {
+      // Update in Supabase
+      const { error } = await supabase
+        .from('marketplaces')
+        .update({ is_active: newActiveState })
+        .eq('id', id);
+        
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Marketplace Updated",
+        description: "Marketplace status has been changed and saved to database.",
+      });
+    } catch (error) {
+      console.error('Error updating marketplace in Supabase:', error);
+      
+      // Revert the UI state if the database update failed
+      setMarketplaces(prev => 
+        prev.map(mp => 
+          mp.id === id 
+            ? { ...mp, isActive: updatedMarketplace.isActive, status: updatedMarketplace.status }
+            : mp
+        )
+      );
+      
+      toast({
+        title: "Error",
+        description: "Failed to update marketplace in database. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleAddMarketplace = () => {
+  const handleAddMarketplace = async () => {
     if (!newMarketplace.name || !newMarketplace.url) {
       toast({
         title: "Missing Information",
@@ -88,30 +142,92 @@ export function Marketplaces() {
       return;
     }
 
-    const marketplace: Marketplace = {
-      id: Date.now().toString(),
-      name: newMarketplace.name,
-      url: newMarketplace.url,
-      isActive: true,
-      lastSync: 'Never',
-      status: 'disconnected'
-    };
+    try {
+      // Let Supabase generate the UUID by not providing an ID
+      const { data, error } = await supabase
+        .from('marketplaces')
+        .insert({
+          name: newMarketplace.name,
+          base_url: newMarketplace.url,
+          is_active: true,
+          api_key: newMarketplace.apiKey || null
+        })
+        .select(); // Add select() to return the inserted row with the generated ID
 
-    setMarketplaces(prev => [...prev, marketplace]);
-    setNewMarketplace({ name: '', url: '', apiKey: '' });
-    
-    toast({
-      title: "Marketplace Added",
-      description: `${newMarketplace.name} has been added successfully.`,
-    });
+      if (error) {
+        throw error;
+      }
+
+      // Get the generated ID from the response
+      if (data && data.length > 0) {
+        const newId = data[0].id;
+        
+        // Create marketplace object for UI state with the ID from Supabase
+        const marketplace: Marketplace = {
+          id: newId,
+          name: newMarketplace.name,
+          url: newMarketplace.url,
+          isActive: true,
+          lastSync: 'Never',
+          status: 'connected',
+          apiKey: newMarketplace.apiKey
+        };
+
+        // Update local state
+        setMarketplaces(prev => [...prev, marketplace]);
+        setNewMarketplace({ name: '', url: '', apiKey: '' });
+        
+        toast({
+          title: "Marketplace Added",
+          description: `${newMarketplace.name} has been added successfully and saved to database.`,
+        });
+      } else {
+        throw new Error('No data returned from insert operation');
+      }
+    } catch (error) {
+      console.error('Error saving marketplace to Supabase:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save marketplace to database. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDeleteMarketplace = (id: string) => {
+  const handleDeleteMarketplace = async (id: string) => {
+    // First update the UI for immediate feedback
+    const deletedMarketplace = marketplaces.find(mp => mp.id === id);
     setMarketplaces(prev => prev.filter(mp => mp.id !== id));
-    toast({
-      title: "Marketplace Removed",
-      description: "Marketplace has been deleted.",
-    });
+    
+    try {
+      // Delete from Supabase
+      const { error } = await supabase
+        .from('marketplaces')
+        .delete()
+        .eq('id', id);
+        
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Marketplace Removed",
+        description: "Marketplace has been deleted from the database.",
+      });
+    } catch (error) {
+      console.error('Error deleting marketplace from Supabase:', error);
+      
+      // Restore the marketplace in UI if database deletion failed
+      if (deletedMarketplace) {
+        setMarketplaces(prev => [...prev, deletedMarketplace]);
+      }
+      
+      toast({
+        title: "Error",
+        description: "Failed to delete marketplace from database. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -166,48 +282,67 @@ export function Marketplaces() {
           </div>
 
           <div className="grid gap-4">
-            {marketplaces.map((marketplace) => (
-              <Card key={marketplace.id}>
+            {isLoading ? (
+              <Card>
                 <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <Store className="h-8 w-8 text-gray-400" />
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold">{marketplace.name}</h3>
-                          <Badge className={getStatusColor(marketplace.status)}>
-                            {marketplace.status}
-                          </Badge>
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          Last sync: {marketplace.lastSync}
-                        </div>
-                        <div className="flex items-center gap-1 text-sm text-blue-600">
-                          <ExternalLink className="h-3 w-3" />
-                          {marketplace.url}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={marketplace.isActive}
-                        onCheckedChange={() => handleToggleMarketplace(marketplace.id)}
-                      />
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleDeleteMarketplace(marketplace.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <div className="flex items-center justify-center p-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span className="ml-3">Loading marketplaces...</span>
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            ) : marketplaces.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center p-4">
+                    <p className="text-gray-500">No marketplaces found. Add your first marketplace using the "Add Marketplace" tab.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              marketplaces.map((marketplace) => (
+                <Card key={marketplace.id}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <Store className="h-8 w-8 text-gray-400" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">{marketplace.name}</h3>
+                            <Badge className={getStatusColor(marketplace.status)}>
+                              {marketplace.status}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Last sync: {marketplace.lastSync}
+                          </div>
+                          <div className="flex items-center gap-1 text-sm text-blue-600">
+                            <ExternalLink className="h-3 w-3" />
+                            {marketplace.url}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={marketplace.isActive}
+                          onCheckedChange={() => handleToggleMarketplace(marketplace.id)}
+                        />
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleDeleteMarketplace(marketplace.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </TabsContent>
 
