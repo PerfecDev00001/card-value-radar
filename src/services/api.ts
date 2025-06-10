@@ -14,6 +14,7 @@ export interface SearchResult {
   image: string;
   url: string;
   difference: number;
+  differenceBase?: string; // What the difference is compared to (e.g., "Market Average", "Lowest Price", etc.)
 }
 
 export class CardSearchAPI {
@@ -69,7 +70,8 @@ export class CardSearchAPI {
         price: 299.99,
         image: 'https://via.placeholder.com/100x140?text=Card',
         url: 'https://www.ebay.com/itm/123456789',
-        difference: 5.2
+        difference: 5.2,
+        differenceBase: 'Market Average'
       },
       {
         id: '2',
@@ -78,7 +80,8 @@ export class CardSearchAPI {
         price: 285.00,
         image: 'https://via.placeholder.com/100x140?text=Card',
         url: 'https://www.cardshq.com/card/123456',
-        difference: -2.8
+        difference: -2.8,
+        differenceBase: 'Market Average'
       },
       {
         id: '3',
@@ -87,7 +90,8 @@ export class CardSearchAPI {
         price: 310.50,
         image: 'https://via.placeholder.com/100x140?text=Card',
         url: 'https://www.myslabs.com/card/789012',
-        difference: 8.9
+        difference: 8.9,
+        differenceBase: 'Market Average'
       },
       {
         id: '4',
@@ -96,7 +100,8 @@ export class CardSearchAPI {
         price: 189.99,
         image: 'https://via.placeholder.com/100x140?text=Card',
         url: 'https://www.ebay.com/itm/987654321',
-        difference: -1.5
+        difference: -1.5,
+        differenceBase: 'Similar Cards'
       }
     ];
 

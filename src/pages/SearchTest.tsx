@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CustomMultiSelect } from '@/components/ui/custom-multi-select';
 import { useToast } from '@/hooks/use-toast';
-import { Search as SearchIcon, ExternalLink, ChevronLeft, ChevronRight, Filter, Loader2 } from 'lucide-react';
+import { Search as SearchIcon, ExternalLink, ChevronLeft, ChevronRight, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { cardSearchAPI, type SearchResult } from '@/services/api';
 
 export function SearchTest() {
@@ -22,9 +22,10 @@ export function SearchTest() {
   
   // Filter state
   const [marketFilter, setMarketFilter] = useState<string[]>([]);
-  const [cardFilter, setCardFilter] = useState('');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
+  
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'market' | 'card' | 'price' | 'difference' | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
   const { toast } = useToast();
   
@@ -92,11 +93,9 @@ export function SearchTest() {
     setLoading(true);
     // Clear old data immediately when starting new search
     setResults([]);
-    // Reset filters and pagination
+    // Reset filters, sorting and pagination
     setMarketFilter([]);
-    setCardFilter('');
-    setMinPrice('');
-    setMaxPrice('');
+    setSortBy(null);
     setCurrentPage(1);
     
     try {
@@ -123,31 +122,55 @@ export function SearchTest() {
     }
   };
 
-  // Filter and pagination logic
+  // Filter and sorting logic
   const filteredResults = useMemo(() => {
-    return results.filter(result => {
+    let filtered = results.filter(result => {
       // Market filter
       if (marketFilter.length > 0 && !marketFilter.includes(result.market.toLowerCase())) {
         return false;
       }
       
-      // Card name filter
-      if (cardFilter && !result.card.toLowerCase().includes(cardFilter.toLowerCase())) {
-        return false;
-      }
-      
-      // Price range filter
-      if (minPrice && result.price < parseFloat(minPrice)) {
-        return false;
-      }
-      
-      if (maxPrice && result.price > parseFloat(maxPrice)) {
-        return false;
-      }
-      
       return true;
     });
-  }, [results, marketFilter, cardFilter, minPrice, maxPrice]);
+
+    // Apply sorting
+    if (sortBy) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue: any, bValue: any;
+        
+        switch (sortBy) {
+          case 'market':
+            aValue = a.market.toLowerCase();
+            bValue = b.market.toLowerCase();
+            break;
+          case 'card':
+            aValue = a.card.toLowerCase();
+            bValue = b.card.toLowerCase();
+            break;
+          case 'price':
+            aValue = a.price;
+            bValue = b.price;
+            break;
+          case 'difference':
+            aValue = a.difference;
+            bValue = b.difference;
+            break;
+          default:
+            return 0;
+        }
+        
+        if (typeof aValue === 'string') {
+          return sortOrder === 'asc' 
+            ? aValue.localeCompare(bValue)
+            : bValue.localeCompare(aValue);
+        } else {
+          return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
+        }
+      });
+    }
+
+    return filtered;
+  }, [results, marketFilter, sortBy, sortOrder]);
 
   const paginatedResults = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -163,10 +186,21 @@ export function SearchTest() {
 
   const clearFilters = () => {
     setMarketFilter([]);
-    setCardFilter('');
-    setMinPrice('');
-    setMaxPrice('');
+    setSortBy(null);
     setCurrentPage(1);
+  };
+
+  const handleSort = (column: 'market' | 'card' | 'price' | 'difference') => {
+    if (sortBy === column) {
+      // If already sorting by this column, toggle order
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      // If sorting by new column, default to appropriate order
+      setSortBy(column);
+      // For text columns, default to ascending; for numbers, default to descending
+      setSortOrder(column === 'market' || column === 'card' ? 'asc' : 'desc');
+    }
+    setCurrentPage(1); // Reset to first page when sorting
   };
 
   // Get unique markets for filter options
@@ -191,6 +225,13 @@ export function SearchTest() {
     if (difference > 0) return 'text-green-600';
     if (difference < 0) return 'text-red-600';
     return 'text-gray-600';
+  };
+
+  const getSortIcon = (column: 'market' | 'card' | 'price' | 'difference') => {
+    if (sortBy !== column) {
+      return <ArrowUpDown className="h-4 w-4" />;
+    }
+    return sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
   };
 
   return (
@@ -279,25 +320,14 @@ export function SearchTest() {
                 </p>
               </div>
 
-              {/* Filters Section */}
-              <div className="border rounded-lg p-4 bg-muted/50">
-                <div className="flex items-center gap-2 mb-3">
-                  <Filter className="h-4 w-4" />
-                  <Label className="text-sm font-medium">Filters</Label>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={clearFilters}
-                    className="ml-auto text-xs"
-                  >
-                    Clear All
-                  </Button>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  {/* Market Filter */}
-                  <div className="space-y-2">
-                    <Label className="text-xs">Market</Label>
+              {/* Filters in Table Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    <Label className="text-sm font-medium">Filter by Market:</Label>
+                  </div>
+                  <div className="w-64">
                     <CustomMultiSelect
                       options={availableMarkets}
                       selected={marketFilter}
@@ -305,54 +335,62 @@ export function SearchTest() {
                       placeholder="All markets"
                     />
                   </div>
-                  
-                  {/* Card Name Filter */}
-                  <div className="space-y-2">
-                    <Label className="text-xs">Card Name</Label>
-                    <Input
-                      placeholder="Filter by card name..."
-                      value={cardFilter}
-                      onChange={(e) => setCardFilter(e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                  
-                  {/* Min Price Filter */}
-                  <div className="space-y-2">
-                    <Label className="text-xs">Min Price ($)</Label>
-                    <Input
-                      type="number"
-                      placeholder="0.00"
-                      value={minPrice}
-                      onChange={(e) => setMinPrice(e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                  
-                  {/* Max Price Filter */}
-                  <div className="space-y-2">
-                    <Label className="text-xs">Max Price ($)</Label>
-                    <Input
-                      type="number"
-                      placeholder="999999.99"
-                      value={maxPrice}
-                      onChange={(e) => setMaxPrice(e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
                 </div>
+                {(marketFilter.length > 0 || sortBy) && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={clearFilters}
+                    className="text-xs"
+                  >
+                    Clear Filters & Sort
+                  </Button>
+                )}
               </div>
 
               {/* Table */}
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Market</TableHead>
-                    <TableHead>Card</TableHead>
-                    <TableHead>Price</TableHead>
+                    <TableHead 
+                      className="cursor-pointer select-none hover:bg-muted/50"
+                      onClick={() => handleSort('market')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Market
+                        {getSortIcon('market')}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer select-none hover:bg-muted/50"
+                      onClick={() => handleSort('card')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Card
+                        {getSortIcon('card')}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer select-none hover:bg-muted/50"
+                      onClick={() => handleSort('price')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Price
+                        {getSortIcon('price')}
+                      </div>
+                    </TableHead>
                     <TableHead>Image</TableHead>
                     <TableHead>URL</TableHead>
-                    <TableHead>Difference</TableHead>
+                    <TableHead 
+                      className="cursor-pointer select-none hover:bg-muted/50"
+                      onClick={() => handleSort('difference')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Difference
+                        {getSortIcon('difference')}
+                      </div>
+                    </TableHead>
+                    <TableHead>Difference Base</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -401,6 +439,9 @@ export function SearchTest() {
                         <span className={getDifferenceColor(result.difference)}>
                           {formatDifference(result.difference)}
                         </span>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {result.differenceBase || 'N/A'}
                       </TableCell>
                     </TableRow>
                   ))}
