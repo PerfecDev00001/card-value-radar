@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,12 +27,48 @@ export function SearchTest() {
   const [maxPrice, setMaxPrice] = useState('');
   
   const { toast } = useToast();
-
-  const marketplaceOptions = [
-    { label: 'eBay', value: 'ebay' },
-    { label: 'CardsHQ', value: 'cardshq' },
-    { label: 'MySlabs', value: 'myslabs' }
-  ];
+  
+  // State for marketplace options fetched from Supabase
+  const [marketplaceOptions, setMarketplaceOptions] = useState<{ label: string; value: string }[]>([]);
+  const [fetchingMarketplaces, setFetchingMarketplaces] = useState(false);
+  
+  // Fetch marketplaces from Supabase
+  useEffect(() => {
+    const fetchMarketplaces = async () => {
+      setFetchingMarketplaces(true);
+      try {
+        const { data, error } = await supabase
+          .from('marketplaces')
+          .select('id, name')
+          .eq('is_active', true);
+          
+        if (error) {
+          throw error;
+        }
+        
+        if (data) {
+          // Transform the data to the format expected by CustomMultiSelect
+          const options = data.map(marketplace => ({
+            label: marketplace.name,
+            value: marketplace.name,
+          }));
+          //marketplace.id.toLowerCase()
+          setMarketplaceOptions(options);
+        }
+      } catch (error) {
+        console.error('Error fetching marketplaces:', error);
+        toast({
+          title: "Failed to load marketplaces",
+          description: "There was an error loading marketplace options",
+          variant: "destructive"
+        });
+      } finally {
+        setFetchingMarketplaces(false);
+      }
+    };
+    
+    fetchMarketplaces();
+  }, [toast]);
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
@@ -200,15 +237,22 @@ export function SearchTest() {
                   options={marketplaceOptions}
                   selected={selectedMarketplaces}
                   onChange={setSelectedMarketplaces}
-                  placeholder="Select marketplaces to search..."
+                  placeholder={fetchingMarketplaces ? "Loading marketplaces..." : "Select marketplaces to search..."}
+                  disabled={fetchingMarketplaces}
                 />
+                {fetchingMarketplaces && (
+                  <div className="flex items-center mt-1 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Loading marketplace options...
+                  </div>
+                )}
               </div>
 
               {/* Search Button - 10% */}
               <div className="w-[10%]">
                 <Button 
                   onClick={handleSearch} 
-                  disabled={loading}
+                  disabled={loading || fetchingMarketplaces || marketplaceOptions.length === 0}
                   className="w-full"
                   size="lg"
                 >

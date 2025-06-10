@@ -12,6 +12,7 @@ interface CustomMultiSelectProps {
   onChange: (selected: string[]) => void
   placeholder?: string
   className?: string
+  disabled?: boolean
 }
 
 export function CustomMultiSelect({
@@ -19,7 +20,8 @@ export function CustomMultiSelect({
   selected = [],
   onChange,
   placeholder = "Select items...",
-  className
+  className,
+  disabled = false
 }: CustomMultiSelectProps) {
   const [open, setOpen] = React.useState(false)
   const [searchTerm, setSearchTerm] = React.useState("")
@@ -75,6 +77,7 @@ export function CustomMultiSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          disabled={disabled}
           className={cn(
             "w-full justify-between min-h-10 h-auto",
             className
