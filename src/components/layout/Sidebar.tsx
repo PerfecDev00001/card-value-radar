@@ -24,8 +24,8 @@ interface SidebarProps {
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
+  { id: 'search-test', label: 'Manual Search', icon: TestTube },
   { id: 'search', label: 'Search', icon: Search },
-  { id: 'search-test', label: 'Search Test', icon: TestTube },
   { id: 'results', label: 'Results', icon: BarChart3 },
   { id: 'alerts', label: 'Alerts', icon: Bell },
   { id: 'trends', label: 'Price Trends', icon: TrendingUp },

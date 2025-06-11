@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,9 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { Search as SearchIcon, Calendar, Filter, Save } from 'lucide-react';
+import { Search as SearchIcon, Calendar, Filter, Save, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { Skeleton } from '@/components/ui/skeleton';
 interface SearchFilters {
   condition: string[];
   gradingCompany: string[];
@@ -17,24 +19,80 @@ interface SearchFilters {
 }
 
 export function Search() {
-  const [searchTerms, setSearchTerms] = useState('');
-  const [timeFrame, setTimeFrame] = useState('7');
-  const [schedule, setSchedule] = useState('manual');
-  const [selectedMarketplaces, setSelectedMarketplaces] = useState<string[]>(['ebay']);
+  const [searchTerms, setSearchTerms] = useState('Loading...');
+  const [timeFrame, setTimeFrame] = useState('30');
+  const [schedule, setSchedule] = useState('1h');
+  const [selectedMarketplaces, setSelectedMarketplaces] = useState<string[]>(['temp']);
   const [filters, setFilters] = useState<SearchFilters>({
-    condition: [],
-    gradingCompany: [],
-    priceRange: { min: null, max: null }
+    condition: ['Raw'],
+    gradingCompany: ['PSA'],
+    priceRange: { min: 10, max: 100 }
   });
   const [loading, setLoading] = useState(false);
+  const [savingSearch, setSavingSearch] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
+  // State for marketplace options fetched from Supabase
+  const [marketplaces, setMarketplaceOptions] = useState<{ id: string; name: string; enabled: boolean; is_active?: boolean; }[]>([]);
+  const [fetchingMarketplaces, setFetchingMarketplaces] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  
+  // Function to clear all settings
+  const clearAllSettings = () => {
+    setSearchTerms('');
+    setTimeFrame('7');
+    setSchedule('manual');
+    setSelectedMarketplaces([]);
+    setFilters({
+      condition: [],
+      gradingCompany: [],
+      priceRange: { min: null, max: null }
+    });
+  };
 
-  const marketplaces = [
-    { id: 'ebay', name: 'eBay', enabled: true },
-    { id: 'pwcc', name: 'PWCC Marketplace', enabled: true },
-    { id: 'comc', name: 'COMC', enabled: true },
-    { id: 'myslabs', name: 'MySlabs', enabled: true },
-  ];
+  // Fetch marketplaces from Supabase
+  useEffect(() => {
+    const fetchMarketplaces = async () => {
+      setFetchingMarketplaces(true);
+      try {
+        const { data, error } = await supabase
+            .from('marketplaces')
+            .select('id, name, is_active');
+
+        if (error) {
+          throw error;
+        }
+
+        if (data) {
+          // Transform the data to the format expected by CustomMultiSelect
+          const options = data.map(marketplace => ({
+            id: marketplace.name,
+            name: marketplace.name,
+            enabled: marketplace.is_active ?? true
+          }));
+          //marketplace.id.toLowerCase()
+          setMarketplaceOptions(options);
+        }
+      } catch (error) {
+        toast({
+          title: "Failed to load marketplaces",
+          description: "There was an error loading marketplace options",
+          variant: "destructive"
+        });
+      } finally {
+        setFetchingMarketplaces(false);
+      }
+    };
+    fetchMarketplaces();
+  }, [toast]);
+
+  // Clear all settings when marketplaces are loaded for the first time
+  useEffect(() => {
+    if (marketplaces.length > 0 && isInitialLoad) {
+      setIsInitialLoad(false);
+      clearAllSettings();
+    }
+  }, [marketplaces.length, isInitialLoad]);
 
   const conditions = ['Raw', 'Graded', 'PSA 10', 'PSA 9', 'BGS 9.5', 'BGS 9'];
   const gradingCompanies = ['PSA', 'BGS', 'SGC', 'CSG'];
@@ -115,18 +173,59 @@ export function Search() {
       return;
     }
 
+    if (selectedMarketplaces.length === 0) {
+      toast({
+        title: "Marketplace required",
+        description: "Please select at least one marketplace before saving",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSavingSearch(true);
+    
     try {
-      // Save search logic will be implemented later
+      // For now, we'll use a dummy user_id. In a real app, this would come from authentication
+      // const dummyUserId = user.id; // This should be replaced with actual user authentication
+
+      const searchData = {
+        search_terms: searchTerms.trim(),
+        filters: {
+          marketplaces: selectedMarketplaces,
+          condition: filters.condition,
+          gradingCompany: filters.gradingCompany,
+          priceRange: filters.priceRange
+        },
+        schedule: schedule,
+        time_frame: parseInt(timeFrame),
+        is_active: true,
+        user_id: user.id
+      };
+
+      const { data, error } = await supabase
+        .from('saved_searches')
+        .insert([searchData])
+        .select();
+
+      if (error) {
+        throw error;
+      }
+
       toast({
         title: "Search saved!",
-        description: "Your search has been saved and will run according to your schedule",
+        description: `Your search "${searchTerms}" has been saved and will run according to your ${schedule} schedule`,
       });
+
+      // Clear all settings after successful save
+      clearAllSettings();
     } catch (error) {
       toast({
         title: "Save failed",
         description: "There was an error saving your search",
         variant: "destructive"
       });
+    } finally {
+      setSavingSearch(false);
     }
   };
 
@@ -209,26 +308,37 @@ export function Search() {
               {/* Marketplaces */}
               <div className="space-y-3">
                 <Label className="text-base font-medium">Marketplaces</Label>
-                <div className="grid grid-cols-2 gap-3">
-                  {marketplaces.map((marketplace) => (
-                    <div key={marketplace.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={marketplace.id}
-                        checked={selectedMarketplaces.includes(marketplace.id)}
-                        onCheckedChange={(checked) => 
-                          handleMarketplaceChange(marketplace.id, checked as boolean)
-                        }
-                        disabled={!marketplace.enabled}
-                      />
-                      <Label 
-                        htmlFor={marketplace.id}
-                        className={!marketplace.enabled ? 'text-muted-foreground' : ''}
-                      >
-                        {marketplace.name}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+                {fetchingMarketplaces ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="flex items-center space-x-2">
+                        <Skeleton className="h-4 w-4" />
+                        <Skeleton className="h-4 w-20" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {marketplaces.map((marketplace) => (
+                      <div key={marketplace.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={marketplace.id}
+                          checked={selectedMarketplaces.includes(marketplace.id)}
+                          onCheckedChange={(checked) => 
+                            handleMarketplaceChange(marketplace.id, checked as boolean)
+                          }
+                          disabled={!marketplace.enabled}
+                        />
+                        <Label 
+                          htmlFor={marketplace.id}
+                          className={!marketplace.enabled ? 'text-muted-foreground' : ''}
+                        >
+                          {marketplace.name}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <Separator />
@@ -245,10 +355,20 @@ export function Search() {
                 <Button 
                   variant="outline" 
                   onClick={handleSaveSearch}
+                  disabled={savingSearch}
                   className="flex items-center gap-2"
                 >
-                  <Save className="h-4 w-4" />
-                  Save Search
+                  {savingSearch ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      Save Search
+                    </>
+                  )}
                 </Button>
               </div>
             </CardContent>
