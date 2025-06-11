@@ -14,7 +14,8 @@ import {
   LogOut,
   Home,
   Shield,
-  TestTube
+  TestTube,
+  Activity
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -25,7 +26,8 @@ interface SidebarProps {
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
   { id: 'search-test', label: 'Manual Search', icon: TestTube },
-  { id: 'search', label: 'Search', icon: Search },
+  { id: 'search', label: 'Add Search Card', icon: Search },
+  { id: 'status', label: 'Search Status', icon: Activity },
   { id: 'results', label: 'Results', icon: BarChart3 },
   { id: 'alerts', label: 'Alerts', icon: Bell },
   { id: 'trends', label: 'Price Trends', icon: TrendingUp },

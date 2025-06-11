@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Dashboard } from '@/pages/Dashboard';
 import { Search } from '@/pages/Search';
 import { SearchTest } from '@/pages/SearchTest';
+import { Status } from '@/pages/Status';
 import { Results } from '@/pages/Results';
 import { Alerts } from '@/pages/Alerts';
 import { Trends } from '@/pages/Trends';
@@ -23,6 +24,8 @@ export function MainApp() {
         return <Search />;
       case 'search-test':
         return <SearchTest />;
+      case 'status':
+        return <Status />;
       case 'results':
         return <Results />;
       case 'alerts':
