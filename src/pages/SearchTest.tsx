@@ -113,8 +113,8 @@ export function SearchTest() {
       });
     } catch (error) {
       toast({
-        title: "Search failed",
-        description: "There was an error performing your search",
+        title: "Server connection error",
+        description: "Unable to connect to the server. Please check your internet connection and try again.",
         variant: "destructive"
       });
     } finally {

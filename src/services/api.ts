@@ -47,14 +47,13 @@ export class CardSearchAPI {
         const data = await response.json();
         return data.results || [];
       } else {
-        console.warn('Backend API not available, using mock data');
-        // Fallback to mock data if backend is not available
-        return this.getMockResults(params);
+        throw new Error('Server connection error');
       }
     } catch (error) {
-      console.warn('Backend API error, using mock data:', error);
-      // Fallback to mock data on error
-      return this.getMockResults(params);
+      if (error instanceof Error && error.message === 'Server connection error') {
+        throw error;
+      }
+      throw new Error('Server connection error');
     }
   }
 
