@@ -345,13 +345,7 @@ export function Search() {
 
               {/* Action Buttons */}
               <div className="flex gap-3">
-                <Button 
-                  onClick={handleSearch} 
-                  disabled={loading}
-                  className="flex-1"
-                >
-                  {loading ? 'Searching...' : 'Search Now'}
-                </Button>
+
                 <Button 
                   variant="outline" 
                   onClick={handleSaveSearch}
