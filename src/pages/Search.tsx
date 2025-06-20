@@ -294,8 +294,8 @@ export function Search() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1min">Every 1 minutes</SelectItem>
                     <SelectItem value="10min">Every 10 minutes</SelectItem>
+                    <SelectItem value="15min">Every 15 minutes</SelectItem>
                     <SelectItem value="1h">Every hour</SelectItem>
                     <SelectItem value="6h">Every 6 hours</SelectItem>
                     <SelectItem value="24h">Daily</SelectItem>

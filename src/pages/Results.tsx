@@ -182,7 +182,7 @@ export function Results() {
 
   const getPriceChangePercentage = (currentPrice: number | null, avgPrice: number | null) => {
     if (!currentPrice || !avgPrice || avgPrice === 0) return '0.0';
-    return ((currentPrice - avgPrice) / avgPrice * 100).toFixed(1);
+    return (currentPrice - avgPrice).toFixed(1);
   };
 
   const getMarketplaceBadgeColor = (marketplace: string) => {
@@ -332,11 +332,6 @@ export function Results() {
                       <Badge className={`text-xs mt-1 ${getMarketplaceBadgeColor(result.marketplace_name || '')}`}>
                         {result.marketplace_name}
                       </Badge>
-                      {result.condition && (
-                        <Badge variant="outline" className="ml-1 text-xs">
-                          {result.condition} {result.grade && `(${result.grade})`}
-                        </Badge>
-                      )}
                     </div>
 
                     <Separator />
@@ -363,7 +358,7 @@ export function Results() {
                             result.price > result.sold_price_avg ? 'text-red-600' : 'text-green-600'
                           }`}>
                             {result.price > result.sold_price_avg ? '+' : ''}
-                            {getPriceChangePercentage(result.price, result.sold_price_avg)}%
+                            {getPriceChangePercentage(result.price, result.sold_price_avg)}
                           </span>
                         </div>
                       )}
@@ -381,7 +376,7 @@ export function Results() {
                       )}
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Date Found</span>
-                        <span>{result.date_fetched ? new Date(result.date_fetched).toLocaleDateString() : 'N/A'}</span>
+                        <span>{result.date_fetched ? new Date(result.date_fetched).toLocaleString() : 'N/A'}</span>
                       </div>
                     </div>
 
