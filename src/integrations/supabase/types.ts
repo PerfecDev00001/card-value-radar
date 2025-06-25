@@ -70,32 +70,38 @@ export type Database = {
       }
       alerts: {
         Row: {
-          card_name: string
           created_at: string | null
+          email: boolean
           id: string
           is_active: boolean | null
           percentage_threshold: number | null
           price_threshold: number | null
+          saved_search_id: string
+          sms_push: boolean
           updated_at: string | null
           user_id: string
         }
         Insert: {
-          card_name: string
           created_at?: string | null
+          email?: boolean
           id?: string
           is_active?: boolean | null
           percentage_threshold?: number | null
           price_threshold?: number | null
+          saved_search_id: string
+          sms_push?: boolean
           updated_at?: string | null
           user_id: string
         }
         Update: {
-          card_name?: string
           created_at?: string | null
+          email?: boolean
           id?: string
           is_active?: boolean | null
           percentage_threshold?: number | null
           price_threshold?: number | null
+          saved_search_id?: string
+          sms_push?: boolean
           updated_at?: string | null
           user_id?: string
         }
@@ -105,6 +111,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alerts_saved_search_id_fkey"
+            columns: ["saved_search_id"]
+            isOneToOne: false
+            referencedRelation: "saved_searches"
             referencedColumns: ["id"]
           },
         ]
