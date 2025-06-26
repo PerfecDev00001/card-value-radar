@@ -55,7 +55,6 @@ export function Alerts() {
     const [editingAlert, setEditingAlert] = useState<Alert | null>(null);
     const [newAlert, setNewAlert] = useState({
         saved_search_id: '',
-        alertType: 'price' as 'price' | 'percentage',
         price_threshold: '',
         percentage_threshold: '',
         email: true,
@@ -63,7 +62,6 @@ export function Alerts() {
     });
     const [editAlert, setEditAlert] = useState({
         saved_search_id: '',
-        alertType: 'price' as 'price' | 'percentage',
         price_threshold: '',
         percentage_threshold: '',
         email: true,
@@ -153,19 +151,10 @@ export function Alerts() {
             return;
         }
 
-        if (newAlert.alertType === 'price' && !newAlert.price_threshold) {
+        if (!newAlert.price_threshold && !newAlert.percentage_threshold) {
             toast({
-                title: "Price threshold required",
-                description: "Please enter a price threshold",
-                variant: "destructive"
-            });
-            return;
-        }
-
-        if (newAlert.alertType === 'percentage' && !newAlert.percentage_threshold) {
-            toast({
-                title: "Percentage threshold required",
-                description: "Please enter a percentage threshold",
+                title: "Threshold required",
+                description: "Please enter at least one threshold (price or percentage)",
                 variant: "destructive"
             });
             return;
@@ -194,8 +183,8 @@ export function Alerts() {
             const alertData = {
                 user_id: user.id,
                 saved_search_id: newAlert.saved_search_id,
-                price_threshold: newAlert.alertType === 'price' ? Number(newAlert.price_threshold) : null,
-                percentage_threshold: newAlert.alertType === 'percentage' ? Number(newAlert.percentage_threshold) : null,
+                price_threshold: newAlert.price_threshold ? Number(newAlert.price_threshold) : null,
+                percentage_threshold: newAlert.percentage_threshold ? Number(newAlert.percentage_threshold) : null,
                 email: newAlert.email,
                 sms_push: newAlert.sms_push,
                 is_active: true
@@ -218,7 +207,6 @@ export function Alerts() {
             // Reset form
             setNewAlert({
                 saved_search_id: '',
-                alertType: 'price',
                 price_threshold: '',
                 percentage_threshold: '',
                 email: true,
@@ -229,7 +217,7 @@ export function Alerts() {
             const selectedSearch = savedSearches.find(s => s.id === newAlert.saved_search_id);
             toast({
                 title: "Alert created!",
-                description: `Price alert for "${selectedSearch?.search_terms || 'search'}" has been created`,
+                description: `Alert for "${selectedSearch?.search_terms || 'search'}" has been created`,
             });
         } catch (error) {
             console.error('Error creating alert:', error);
@@ -284,7 +272,7 @@ export function Alerts() {
             setAlerts(alerts.filter(alert => alert.id !== id));
             toast({
                 title: "Alert deleted",
-                description: "The price alert has been removed",
+                description: "The alert has been removed",
             });
         } catch (error) {
             console.error('Error deleting alert:', error);
@@ -300,7 +288,6 @@ export function Alerts() {
         setEditingAlert(alert);
         setEditAlert({
             saved_search_id: alert.saved_search_id,
-            alertType: alert.price_threshold ? 'price' : 'percentage',
             price_threshold: alert.price_threshold?.toString() || '',
             percentage_threshold: alert.percentage_threshold?.toString() || '',
             email: alert.email,
@@ -322,19 +309,10 @@ export function Alerts() {
             return;
         }
 
-        if (editAlert.alertType === 'price' && !editAlert.price_threshold) {
+        if (!editAlert.price_threshold && !editAlert.percentage_threshold) {
             toast({
-                title: "Price threshold required",
-                description: "Please enter a price threshold",
-                variant: "destructive"
-            });
-            return;
-        }
-
-        if (editAlert.alertType === 'percentage' && !editAlert.percentage_threshold) {
-            toast({
-                title: "Percentage threshold required",
-                description: "Please enter a percentage threshold",
+                title: "Threshold required",
+                description: "Please enter at least one threshold (price or percentage)",
                 variant: "destructive"
             });
             return;
@@ -361,8 +339,8 @@ export function Alerts() {
 
             const updateData = {
                 saved_search_id: editAlert.saved_search_id,
-                price_threshold: editAlert.alertType === 'price' ? Number(editAlert.price_threshold) : null,
-                percentage_threshold: editAlert.alertType === 'percentage' ? Number(editAlert.percentage_threshold) : null,
+                price_threshold: editAlert.price_threshold ? Number(editAlert.price_threshold) : null,
+                percentage_threshold: editAlert.percentage_threshold ? Number(editAlert.percentage_threshold) : null,
                 email: editAlert.email,
                 sms_push: editAlert.sms_push,
                 updated_at: new Date().toISOString()
@@ -388,7 +366,6 @@ export function Alerts() {
             setEditingAlert(null);
             setEditAlert({
                 saved_search_id: '',
-                alertType: 'price',
                 price_threshold: '',
                 percentage_threshold: '',
                 email: true,
@@ -428,7 +405,7 @@ export function Alerts() {
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Price Alerts</h1>
                     <p className="text-muted-foreground">
-                        Get notified when card prices drop below your threshold
+                        Get notified when card prices drop below a specific value or by a percentage
                     </p>
                 </div>
                 <Button
@@ -449,7 +426,7 @@ export function Alerts() {
                     <CardHeader>
                         <CardTitle>Create New Alert</CardTitle>
                         <CardDescription>
-                            Set up price notifications for specific cards
+                            Set up price and/or percentage drop notifications for specific cards
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -487,62 +464,53 @@ export function Alerts() {
                         </div>
 
                         <div className="space-y-4">
-                            <Label>Alert Type</Label>
-                            <div className="grid grid-cols-2 gap-4">
-                                <Card
-                                    className={`cursor-pointer transition-colors ${
-                                        newAlert.alertType === 'price' ? 'ring-2 ring-blue-500' : ''
-                                    }`}
-                                    onClick={() => setNewAlert({...newAlert, alertType: 'price'})}
-                                >
-                                    <CardContent className="p-4 text-center">
-                                        <DollarSign className="h-8 w-8 mx-auto mb-2 text-green-600"/>
-                                        <h3 className="font-medium">Fixed Price</h3>
-                                        <p className="text-sm text-muted-foreground">Alert when price drops below a
-                                            specific amount</p>
-                                    </CardContent>
-                                </Card>
-                                <Card
-                                    className={`cursor-pointer transition-colors ${
-                                        newAlert.alertType === 'percentage' ? 'ring-2 ring-blue-500' : ''
-                                    }`}
-                                    onClick={() => setNewAlert({...newAlert, alertType: 'percentage'})}
-                                >
-                                    <CardContent className="p-4 text-center">
-                                        <Percent className="h-8 w-8 mx-auto mb-2 text-blue-600"/>
-                                        <h3 className="font-medium">Percentage Drop</h3>
-                                        <p className="text-sm text-muted-foreground">Alert when price drops by a
-                                            percentage</p>
-                                    </CardContent>
-                                </Card>
+                            <Label>Alert Thresholds</Label>
+                            <p className="text-sm text-muted-foreground">
+                                Set one or both thresholds. You'll be notified when either condition is met.
+                            </p>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="priceThreshold" className="flex items-center gap-2">
+                                        <DollarSign className="h-4 w-4 text-green-600"/>
+                                        Price Threshold ($)
+                                    </Label>
+                                    <Input
+                                        id="priceThreshold"
+                                        type="number"
+                                        placeholder="120.00"
+                                        value={newAlert.price_threshold}
+                                        onChange={(e) => setNewAlert({...newAlert, price_threshold: e.target.value})}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Alert when price drops below this amount
+                                    </p>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    <Label htmlFor="percentageThreshold" className="flex items-center gap-2">
+                                        <Percent className="h-4 w-4 text-blue-600"/>
+                                        Percentage Drop (%)
+                                    </Label>
+                                    <Input
+                                        id="percentageThreshold"
+                                        type="number"
+                                        placeholder="15"
+                                        value={newAlert.percentage_threshold}
+                                        onChange={(e) => setNewAlert({...newAlert, percentage_threshold: e.target.value})}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Alert when price drops by this percentage
+                                    </p>
+                                </div>
                             </div>
+                            
+                            {!newAlert.price_threshold && !newAlert.percentage_threshold && (
+                                <p className="text-sm text-orange-600">
+                                    ⚠️ Please set at least one threshold
+                                </p>
+                            )}
                         </div>
-
-                        {newAlert.alertType === 'price' && (
-                            <div className="space-y-2">
-                                <Label htmlFor="priceThreshold">Price Threshold ($)</Label>
-                                <Input
-                                    id="priceThreshold"
-                                    type="number"
-                                    placeholder="120.00"
-                                    value={newAlert.price_threshold}
-                                    onChange={(e) => setNewAlert({...newAlert, price_threshold: e.target.value})}
-                                />
-                            </div>
-                        )}
-
-                        {newAlert.alertType === 'percentage' && (
-                            <div className="space-y-2">
-                                <Label htmlFor="percentageThreshold">Percentage Drop (%)</Label>
-                                <Input
-                                    id="percentageThreshold"
-                                    type="number"
-                                    placeholder="15"
-                                    value={newAlert.percentage_threshold}
-                                    onChange={(e) => setNewAlert({...newAlert, percentage_threshold: e.target.value})}
-                                />
-                            </div>
-                        )}
 
                         <div className="space-y-3">
                             <Label>Notification Methods</Label>
@@ -595,7 +563,7 @@ export function Alerts() {
                     <CardHeader>
                         <CardTitle>Edit Alert</CardTitle>
                         <CardDescription>
-                            Update your price notification settings
+                            Update your price and percentage drop notification settings
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -626,62 +594,53 @@ export function Alerts() {
                         </div>
 
                         <div className="space-y-4">
-                            <Label>Alert Type</Label>
-                            <div className="grid grid-cols-2 gap-4">
-                                <Card
-                                    className={`cursor-pointer transition-colors ${
-                                        editAlert.alertType === 'price' ? 'ring-2 ring-blue-500' : ''
-                                    }`}
-                                    onClick={() => setEditAlert({...editAlert, alertType: 'price'})}
-                                >
-                                    <CardContent className="p-4 text-center">
-                                        <DollarSign className="h-8 w-8 mx-auto mb-2 text-green-600"/>
-                                        <h3 className="font-medium">Fixed Price</h3>
-                                        <p className="text-sm text-muted-foreground">Alert when price drops below a
-                                            specific amount</p>
-                                    </CardContent>
-                                </Card>
-                                <Card
-                                    className={`cursor-pointer transition-colors ${
-                                        editAlert.alertType === 'percentage' ? 'ring-2 ring-blue-500' : ''
-                                    }`}
-                                    onClick={() => setEditAlert({...editAlert, alertType: 'percentage'})}
-                                >
-                                    <CardContent className="p-4 text-center">
-                                        <Percent className="h-8 w-8 mx-auto mb-2 text-blue-600"/>
-                                        <h3 className="font-medium">Percentage Drop</h3>
-                                        <p className="text-sm text-muted-foreground">Alert when price drops by a
-                                            percentage</p>
-                                    </CardContent>
-                                </Card>
+                            <Label>Alert Thresholds</Label>
+                            <p className="text-sm text-muted-foreground">
+                                Set one or both thresholds. You'll be notified when either condition is met.
+                            </p>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="editPriceThreshold" className="flex items-center gap-2">
+                                        <DollarSign className="h-4 w-4 text-green-600"/>
+                                        Price Threshold ($)
+                                    </Label>
+                                    <Input
+                                        id="editPriceThreshold"
+                                        type="number"
+                                        placeholder="120.00"
+                                        value={editAlert.price_threshold}
+                                        onChange={(e) => setEditAlert({...editAlert, price_threshold: e.target.value})}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Alert when price drops below this amount
+                                    </p>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    <Label htmlFor="editPercentageThreshold" className="flex items-center gap-2">
+                                        <Percent className="h-4 w-4 text-blue-600"/>
+                                        Percentage Drop (%)
+                                    </Label>
+                                    <Input
+                                        id="editPercentageThreshold"
+                                        type="number"
+                                        placeholder="15"
+                                        value={editAlert.percentage_threshold}
+                                        onChange={(e) => setEditAlert({...editAlert, percentage_threshold: e.target.value})}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Alert when price drops by this percentage
+                                    </p>
+                                </div>
                             </div>
+                            
+                            {!editAlert.price_threshold && !editAlert.percentage_threshold && (
+                                <p className="text-sm text-orange-600">
+                                    ⚠️ Please set at least one threshold
+                                </p>
+                            )}
                         </div>
-
-                        {editAlert.alertType === 'price' && (
-                            <div className="space-y-2">
-                                <Label htmlFor="editPriceThreshold">Price Threshold ($)</Label>
-                                <Input
-                                    id="editPriceThreshold"
-                                    type="number"
-                                    placeholder="120.00"
-                                    value={editAlert.price_threshold}
-                                    onChange={(e) => setEditAlert({...editAlert, price_threshold: e.target.value})}
-                                />
-                            </div>
-                        )}
-
-                        {editAlert.alertType === 'percentage' && (
-                            <div className="space-y-2">
-                                <Label htmlFor="editPercentageThreshold">Percentage Drop (%)</Label>
-                                <Input
-                                    id="editPercentageThreshold"
-                                    type="number"
-                                    placeholder="15"
-                                    value={editAlert.percentage_threshold}
-                                    onChange={(e) => setEditAlert({...editAlert, percentage_threshold: e.target.value})}
-                                />
-                            </div>
-                        )}
 
                         <div className="space-y-3">
                             <Label>Notification Methods</Label>
@@ -745,17 +704,18 @@ export function Alerts() {
                                     </div>
 
                                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                        <div className="flex items-center gap-1">
-                                            {alert.price_threshold ? (
-                                                <>
-                                                    <DollarSign className="h-4 w-4"/>
-                                                    Alert when below ${alert.price_threshold}
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Percent className="h-4 w-4"/>
-                                                    Alert when drops {alert.percentage_threshold}%
-                                                </>
+                                        <div className="flex items-center gap-3">
+                                            {alert.price_threshold && (
+                                                <div className="flex items-center gap-1">
+                                                    <DollarSign className="h-4 w-4 text-green-600"/>
+                                                    Below ${alert.price_threshold}
+                                                </div>
+                                            )}
+                                            {alert.percentage_threshold && (
+                                                <div className="flex items-center gap-1">
+                                                    <Percent className="h-4 w-4 text-blue-600"/>
+                                                    {alert.percentage_threshold}% drop
+                                                </div>
                                             )}
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -812,7 +772,7 @@ export function Alerts() {
                         <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4"/>
                         <h3 className="text-lg font-semibold mb-2">No Alerts Set</h3>
                         <p className="text-muted-foreground mb-4">
-                            Create your first price alert to get notified when card prices drop.
+                            Create your first alert to get notified when card prices drop below your thresholds.
                         </p>
                         <Button onClick={() => setShowCreateForm(true)}>
                             <Plus className="h-4 w-4 mr-2"/>
