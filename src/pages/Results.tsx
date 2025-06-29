@@ -234,28 +234,31 @@ export function Results() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-4">
             <div>
-              <Select value={selectedSearch || ''} onValueChange={setSelectedSearch}>
+              <label className="text-sm font-medium mb-2 block">Saved Search</label>
+              <Select value={selectedSearch || ''} onValueChange={setSelectedSearch} disabled={savedSearches.length === 0}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a saved search" />
+                  <SelectValue placeholder={savedSearches.length === 0 ? "No saved searches available" : "Select a saved search"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {savedSearches.map(search => (
-                    <SelectItem key={search.id} value={search.id}>
-                      {search.search_terms}
-                      {search.filters && 
-                        <span className="ml-2 text-muted-foreground">
-                          ({JSON.stringify(search.filters).substring(0, 20)}...)
-                        </span>
-                      }
+                  {savedSearches.length === 0 ? (
+                    <SelectItem value="" disabled>
+                      No saved searches found. Create some searches first.
                     </SelectItem>
-                  ))}
+                  ) : (
+                    savedSearches.map(search => (
+                      <SelectItem key={search.id} value={search.id}>
+                        {search.search_terms}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Select value={filterMarketplace} onValueChange={setFilterMarketplace}>
+              <label className="text-sm font-medium mb-2 block">Marketplace Filter</label>
+              <Select value={filterMarketplace} onValueChange={setFilterMarketplace} disabled={!selectedSearch}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All Marketplaces" />
+                  <SelectValue placeholder={!selectedSearch ? "Select a search first" : "All Marketplaces"} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Marketplaces</SelectItem>
@@ -268,9 +271,10 @@ export function Results() {
               </Select>
             </div>
             <div>
-              <Select value={sortBy} onValueChange={setSortBy}>
+              <label className="text-sm font-medium mb-2 block">Sort By</label>
+              <Select value={sortBy} onValueChange={setSortBy} disabled={!selectedSearch}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Sort by" />
+                  <SelectValue placeholder={!selectedSearch ? "Select a search first" : "Sort by"} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="price">Price</SelectItem>
@@ -282,10 +286,12 @@ export function Results() {
               </Select>
             </div>
             <div>
+              <label className="text-sm font-medium mb-2 block">Sort Order</label>
               <Button
                 variant="outline"
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
                 className="w-full"
+                disabled={!selectedSearch}
               >
                 {sortOrder === 'asc' ? (
                   <>
@@ -304,7 +310,7 @@ export function Results() {
         </CardContent>
       </Card>
 
-      {selectedSearch && (
+      {selectedSearch ? (
         <>
 
           {/* Results Grid */}
@@ -368,6 +374,12 @@ export function Results() {
 
                     {/* Card Details */}
                     <div className="space-y-1">
+                      {result.card_id && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Card ID</span>
+                          <span>{result.card_id}</span>
+                        </div>
+                      )}
                       {(result.metadata as any)?.seller && (
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Seller</span>
@@ -419,6 +431,19 @@ export function Results() {
             </Card>
           )}
         </>
+      ) : (
+        <Card>
+          <CardContent className="text-center py-12">
+            <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Select a Saved Search</h3>
+            <p className="text-muted-foreground">
+              {savedSearches.length === 0 
+                ? "No saved searches available. Create some searches first to view results here."
+                : "Choose a saved search from the dropdown above to view its results."
+              }
+            </p>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

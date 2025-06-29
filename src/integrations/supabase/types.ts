@@ -349,6 +349,7 @@ export type Database = {
       }
       search_results: {
         Row: {
+          card_id: string | null
           card_name: string
           date_fetched: string | null
           id: string
@@ -360,6 +361,7 @@ export type Database = {
           sold_price_avg: number | null
         }
         Insert: {
+          card_id?: string | null
           card_name: string
           date_fetched?: string | null
           id?: string
@@ -371,6 +373,7 @@ export type Database = {
           sold_price_avg?: number | null
         }
         Update: {
+          card_id?: string | null
           card_name?: string
           date_fetched?: string | null
           id?: string
