@@ -58,7 +58,7 @@ type SearchResult = Database['public']['Tables']['search_results']['Row'] & {
 };
 
 export function Trends() {
-  const [selectedTimeframe, setSelectedTimeframe] = useState('30');
+  const [selectedTimeframe, setSelectedTimeframe] = useState('');
   const [selectedSearch, setSelectedSearch] = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
@@ -98,10 +98,7 @@ export function Trends() {
         
         setSavedSearches(searches || []);
         
-        // If there are saved searches, select the most recent one
-        if (searches && searches.length > 0) {
-          setSelectedSearch(searches[0].id);
-        }
+        // Don't auto-select anything - let user choose
       } catch (error) {
         console.error('Error fetching initial data:', error);
         toast({
@@ -149,12 +146,8 @@ export function Trends() {
         
         setSearchResults(enhancedResults);
         
-        // Auto-select first result if available
-        if (enhancedResults.length > 0) {
-          setSelectedCard(enhancedResults[0].id);
-        } else {
-          setSelectedCard(null);
-        }
+        // Don't auto-select cards - let user choose
+        setSelectedCard(null);
       } catch (error) {
         console.error('Error fetching search results:', error);
         toast({
@@ -287,7 +280,7 @@ export function Trends() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-[40%_40%_15%]">
             <div>
               <label className="text-sm font-medium mb-2 block">Saved Search</label>
               <Popover open={openSearchSelect} onOpenChange={setOpenSearchSelect}>
@@ -299,11 +292,13 @@ export function Trends() {
                     className="w-full justify-between"
                     disabled={savedSearches.length === 0}
                   >
-                    {getSelectedSearchText() ||
-                      (savedSearches.length === 0 
-                        ? "No saved searches available" 
-                        : "Select a saved search")
-                    }
+                    <span className="truncate">
+                      {getSelectedSearchText() ||
+                        (savedSearches.length === 0 
+                          ? "No saved searches available" 
+                          : "Select a saved search")
+                      }
+                    </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
@@ -349,13 +344,15 @@ export function Trends() {
                     className="w-full justify-between"
                     disabled={!selectedSearch || searchResults.length === 0}
                   >
-                    {getSelectedCardText() ||
-                      (!selectedSearch 
-                        ? "Select a search first" 
-                        : searchResults.length === 0 
-                          ? "No results found for this search" 
-                          : "Select a card from results")
-                    }
+                    <span className="truncate">
+                      {getSelectedCardText() ||
+                        (!selectedSearch 
+                          ? "Select a search first" 
+                          : searchResults.length === 0 
+                            ? "No results found for this search" 
+                            : "Select a card from results")
+                      }
+                    </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
@@ -400,7 +397,7 @@ export function Trends() {
               <label className="text-sm font-medium mb-2 block">Time Period</label>
               <Select value={selectedTimeframe} onValueChange={setSelectedTimeframe}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select time period" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="7">Last 7 days</SelectItem>
@@ -425,9 +422,9 @@ export function Trends() {
             }
           </CardTitle>
           <CardDescription>
-            {selectedCard 
+            {selectedCard && selectedTimeframe
               ? `Price trends across different marketplaces over the last ${selectedTimeframe} days`
-              : 'Select a saved search and card to view price trends'
+              : 'Select a saved search, card, and time period to view price trends'
             }
           </CardDescription>
         </CardHeader>
