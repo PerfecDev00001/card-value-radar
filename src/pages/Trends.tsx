@@ -58,7 +58,7 @@ type SearchResult = Database['public']['Tables']['search_results']['Row'] & {
 };
 
 export function Trends() {
-  const [selectedTimeframe, setSelectedTimeframe] = useState('');
+  const [selectedTimeframe, setSelectedTimeframe] = useState('today');
   const [selectedSearch, setSelectedSearch] = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
@@ -163,8 +163,39 @@ export function Trends() {
     fetchSearchResults();
   }, [selectedSearch, marketplaces, toast]);
 
-  // Mock price history data
-  const priceData: PriceData[] = [
+  // Generate today's hourly data
+  const generateTodayData = (): PriceData[] => {
+    const today = new Date();
+    const todayData: PriceData[] = [];
+    
+    for (let hour = 0; hour <= 23; hour++) {
+      const hourDate = new Date(today);
+      hourDate.setHours(hour, 0, 0, 0);
+      
+      // Generate realistic price variations throughout the day
+      const basePrice = 140;
+      const variation = Math.sin(hour / 24 * Math.PI * 2) * 5; // Sine wave for natural variation
+      const randomFactor = (Math.random() - 0.5) * 3; // Small random variation
+      
+      const ebayPrice = basePrice + variation + randomFactor;
+      const pwccPrice = ebayPrice + (Math.random() - 0.5) * 4;
+      const comcPrice = ebayPrice + (Math.random() - 0.5) * 4;
+      const average = (ebayPrice + pwccPrice + comcPrice) / 3;
+      
+      todayData.push({
+        date: hourDate.toISOString(),
+        ebay: Math.round(ebayPrice * 100) / 100,
+        pwcc: Math.round(pwccPrice * 100) / 100,
+        comc: Math.round(comcPrice * 100) / 100,
+        average: Math.round(average * 100) / 100
+      });
+    }
+    
+    return todayData;
+  };
+
+  // Mock price history data for different timeframes
+  const getHistoricalData = (): PriceData[] => [
     { date: '2024-01-01', ebay: 125, pwcc: 130, comc: 128, average: 127.7 },
     { date: '2024-01-05', ebay: 128, pwcc: 132, comc: 130, average: 130.0 },
     { date: '2024-01-10', ebay: 122, pwcc: 128, comc: 125, average: 125.0 },
@@ -173,6 +204,11 @@ export function Trends() {
     { date: '2024-01-25', ebay: 142, pwcc: 145, comc: 144, average: 143.7 },
     { date: '2024-01-30', ebay: 138, pwcc: 142, comc: 140, average: 140.0 },
   ];
+
+  // Get price data based on selected timeframe
+  const priceData: PriceData[] = selectedTimeframe === 'today' 
+    ? generateTodayData() 
+    : getHistoricalData();
 
   // Mock trending cards data
   const trendingCards: TrendCard[] = [
@@ -400,6 +436,7 @@ export function Trends() {
                   <SelectValue placeholder="Select time period" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
                   <SelectItem value="7">Last 7 days</SelectItem>
                   <SelectItem value="30">Last 30 days</SelectItem>
                   <SelectItem value="90">Last 90 days</SelectItem>
@@ -423,7 +460,9 @@ export function Trends() {
           </CardTitle>
           <CardDescription>
             {selectedCard && selectedTimeframe
-              ? `Price trends across different marketplaces over the last ${selectedTimeframe} days`
+              ? selectedTimeframe === 'today' 
+                ? 'Price trends across different marketplaces for today (hourly breakdown)'
+                : `Price trends across different marketplaces over the last ${selectedTimeframe} days`
               : 'Select a saved search, card, and time period to view price trends'
             }
           </CardDescription>
@@ -435,14 +474,29 @@ export function Trends() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="date" 
-                  tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                  tickFormatter={(value) => {
+                    const date = new Date(value);
+                    return selectedTimeframe === 'today' 
+                      ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      : date.toLocaleDateString();
+                  }}
                 />
                 <YAxis 
                   domain={['dataMin - 5', 'dataMax + 5']}
                   tickFormatter={formatCurrency}
                 />
                 <Tooltip 
-                  labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                  labelFormatter={(value) => {
+                    const date = new Date(value);
+                    return selectedTimeframe === 'today' 
+                      ? date.toLocaleString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit',
+                          month: 'short',
+                          day: 'numeric'
+                        })
+                      : date.toLocaleDateString();
+                  }}
                   formatter={(value: number) => [formatCurrency(value), '']}
                 />
                 <Legend />
