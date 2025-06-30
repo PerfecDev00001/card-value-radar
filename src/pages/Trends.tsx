@@ -34,20 +34,21 @@ import { cn } from '@/lib/utils';
 
 interface PriceData {
   date: string;
-  ebay: number;
-  pwcc: number;
-  comc: number;
+  [marketplace: string]: number | string | boolean | undefined;
   average: number;
+  isInflectionPoint?: boolean;
 }
 
-interface TrendCard {
+interface TrendingCard {
   id: string;
   name: string;
   currentPrice: number;
+  volume: number;
   weekChange: number;
   monthChange: number;
-  volume: number;
 }
+
+
 
 // Define types based on Supabase schema
 type SavedSearch = Database['public']['Tables']['saved_searches']['Row'];
@@ -63,11 +64,22 @@ export function Trends() {
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [cardHistoryData, setCardHistoryData] = useState<SearchResult[]>([]);
   const [marketplaces, setMarketplaces] = useState<{[key: string]: string}>({});
   const [loading, setLoading] = useState(true);
   const [openSearchSelect, setOpenSearchSelect] = useState(false);
   const [openCardSelect, setOpenCardSelect] = useState(false);
   const { toast } = useToast();
+
+  // Compute trending cards from search results
+  const trendingCards: TrendingCard[] = searchResults.map((result) => ({
+    id: result.id,
+    name: result.card_name,
+    currentPrice: result.price || 0,
+    volume: 0, // TODO: Calculate actual volume from historical data
+    weekChange: 0, // TODO: Calculate week change from historical data
+    monthChange: 0, // TODO: Calculate month change from historical data
+  }));
 
   // Fetch saved searches and marketplaces on component mount
   useEffect(() => {
@@ -148,6 +160,7 @@ export function Trends() {
         
         // Don't auto-select cards - let user choose
         setSelectedCard(null);
+        setCardHistoryData([]); // Clear card history when search changes
       } catch (error) {
         console.error('Error fetching search results:', error);
         toast({
@@ -163,88 +176,346 @@ export function Trends() {
     fetchSearchResults();
   }, [selectedSearch, marketplaces, toast]);
 
-  // Generate today's hourly data
-  const generateTodayData = (): PriceData[] => {
-    const today = new Date();
-    const todayData: PriceData[] = [];
-    
-    for (let hour = 0; hour <= 23; hour++) {
-      const hourDate = new Date(today);
-      hourDate.setHours(hour, 0, 0, 0);
-      
-      // Generate realistic price variations throughout the day
-      const basePrice = 140;
-      const variation = Math.sin(hour / 24 * Math.PI * 2) * 5; // Sine wave for natural variation
-      const randomFactor = (Math.random() - 0.5) * 3; // Small random variation
-      
-      const ebayPrice = basePrice + variation + randomFactor;
-      const pwccPrice = ebayPrice + (Math.random() - 0.5) * 4;
-      const comcPrice = ebayPrice + (Math.random() - 0.5) * 4;
-      const average = (ebayPrice + pwccPrice + comcPrice) / 3;
-      
-      todayData.push({
-        date: hourDate.toISOString(),
-        ebay: Math.round(ebayPrice * 100) / 100,
-        pwcc: Math.round(pwccPrice * 100) / 100,
-        comc: Math.round(comcPrice * 100) / 100,
-        average: Math.round(average * 100) / 100
-      });
-    }
-    
-    return todayData;
+  // Fetch historical data for selected card
+  useEffect(() => {
+    const fetchCardHistory = async () => {
+      if (!selectedCard || searchResults.length === 0) {
+        setCardHistoryData([]);
+        return;
+      }
+
+      const selectedCardData = searchResults.find(r => r.id === selectedCard);
+      if (!selectedCardData) {
+        setCardHistoryData([]);
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        // Fetch all records with the same card_name from the database
+        const { data, error } = await supabase
+          .from('search_results')
+          .select('*')
+          .eq('card_name', selectedCardData.card_name)
+          .order('date_fetched', { ascending: true });
+
+        if (error) throw error;
+
+        // Enhance results with marketplace names
+        const enhancedHistory = data?.map(result => {
+          const metadata = result.metadata as any || {};
+          return {
+            ...result,
+            marketplace_name: marketplaces[result.marketplace_id] || 'Unknown',
+            condition: metadata.condition || 'Unknown',
+            grade: metadata.grade || null
+          };
+        }) || [];
+
+        setCardHistoryData(enhancedHistory);
+      } catch (error) {
+        console.error('Error fetching card history:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load card price history. Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCardHistory();
+  }, [selectedCard, searchResults, marketplaces, toast]);
+
+
+
+
+
+  // Get unique marketplaces from card history data
+  const getUniqueMarketplaces = (): string[] => {
+    const marketplaceSet = new Set<string>();
+    cardHistoryData.forEach(record => {
+      const marketplace = record.marketplace_name?.toLowerCase();
+      if (marketplace) {
+        marketplaceSet.add(marketplace);
+      }
+    });
+    return Array.from(marketplaceSet);
   };
 
-  // Mock price history data for different timeframes
-  const getHistoricalData = (): PriceData[] => [
-    { date: '2024-01-01', ebay: 125, pwcc: 130, comc: 128, average: 127.7 },
-    { date: '2024-01-05', ebay: 128, pwcc: 132, comc: 130, average: 130.0 },
-    { date: '2024-01-10', ebay: 122, pwcc: 128, comc: 125, average: 125.0 },
-    { date: '2024-01-15', ebay: 135, pwcc: 140, comc: 138, average: 137.7 },
-    { date: '2024-01-20', ebay: 130, pwcc: 135, comc: 133, average: 132.7 },
-    { date: '2024-01-25', ebay: 142, pwcc: 145, comc: 144, average: 143.7 },
-    { date: '2024-01-30', ebay: 138, pwcc: 142, comc: 140, average: 140.0 },
-  ];
-
-  // Get price data based on selected timeframe
-  const priceData: PriceData[] = selectedTimeframe === 'today' 
-    ? generateTodayData() 
-    : getHistoricalData();
-
-  // Mock trending cards data
-  const trendingCards: TrendCard[] = [
-    {
-      id: '1',
-      name: '2021 Topps Chrome Patrick Mahomes PSA 10',
-      currentPrice: 142.50,
-      weekChange: 8.5,
-      monthChange: 15.2,
-      volume: 47
-    },
-    {
-      id: '2',
-      name: '2022 Panini Prizm Tom Brady BGS 9.5',
-      currentPrice: 89.99,
-      weekChange: -5.2,
-      monthChange: -8.1,
-      volume: 32
-    },
-    {
-      id: '3',
-      name: '2020 Panini Select Josh Allen PSA 10',
-      currentPrice: 78.25,
-      weekChange: 12.3,
-      monthChange: 22.8,
-      volume: 28
-    },
-    {
-      id: '4',
-      name: '2021 Panini Prizm Justin Herbert PSA 10',
-      currentPrice: 156.00,
-      weekChange: -2.1,
-      monthChange: 5.4,
-      volume: 19
+  // Convert card history data to chart format
+  const getCardPriceData = (): PriceData[] => {
+    if (!selectedCard || cardHistoryData.length === 0) {
+      return [];
     }
-  ];
+
+    // For "today" timeframe, we need to handle hourly data
+    if (selectedTimeframe === 'today') {
+      // Get the saved search that this card belongs to
+      const cardResult = searchResults.find(r => r.id === selectedCard);
+      const savedSearchId = cardResult?.saved_search_id;
+      
+      // Get the selected saved search for schedule information
+      const selectedSearchData = savedSearchId 
+        ? savedSearches.find(search => search.id === savedSearchId)
+        : null;
+      
+      // Get the creation date of the saved search as the starting point
+      const searchCreatedAt = selectedSearchData?.created_at 
+        ? new Date(selectedSearchData.created_at)
+        : null;
+      
+      // Parse schedule information
+      const schedule = selectedSearchData?.schedule || "hourly";
+      
+      // Find the earliest record for today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Filter records for today
+      const todayRecords = cardHistoryData.filter(record => {
+        if (!record.date_fetched) return false;
+        const recordDate = new Date(record.date_fetched);
+        return recordDate >= today;
+      });
+      
+      // Determine inflection points based on schedule
+      const currentHour = new Date().getHours();
+      const getInflectionHours = (): number[] => {
+        if (!searchCreatedAt) return [0, 6, 12, 18]; // Default inflection points
+        
+        if (schedule === "hourly") {
+          // Every hour is an inflection point
+          return Array.from({ length: currentHour + 1 }, (_, i) => i);
+        } else if (schedule === "daily") {
+          // Just use the hour when the search was created
+          const creationHour = searchCreatedAt.getHours();
+          return [creationHour].filter(h => h <= currentHour);
+        } else if (schedule.startsWith("every")) {
+          // Parse "every X hours" format
+          const match = schedule.match(/every\s+(\d+)\s+hours?/i);
+          const interval = match ? parseInt(match[1], 10) : 4; // Default to 4 if parsing fails
+          
+          // Calculate inflection points at regular intervals
+          const startHour = searchCreatedAt.getHours();
+          const points: number[] = [];
+          
+          // Start from the creation hour and add points at regular intervals
+          for (let h = startHour; h <= currentHour; h += interval) {
+            points.push(h);
+          }
+          
+          // Also add points from midnight at regular intervals
+          for (let h = 0; h < startHour; h += interval) {
+            if (!points.includes(h)) {
+              points.push(h);
+            }
+          }
+          
+          // Sort the points
+          points.sort((a, b) => a - b);
+          
+          return points;
+        }
+        
+        // Default to every 4 hours
+        return [0, 4, 8, 12, 16, 20].filter(h => h <= currentHour);
+      };
+      
+      const inflectionHours = getInflectionHours();
+      
+      // Create hourly data points from 0 to current hour
+      const chartData: PriceData[] = [];
+      const baseDate = new Date();
+      baseDate.setHours(0, 0, 0, 0);
+      
+      // Group by hour and marketplace if we have today's records
+      const hourlyData: { [hour: number]: { [marketplace: string]: number } } = {};
+      
+      if (todayRecords.length > 0) {
+        todayRecords.forEach(record => {
+          if (!record.date_fetched) return;
+          
+          const recordDate = new Date(record.date_fetched);
+          const hour = recordDate.getHours();
+          const marketplace = record.marketplace_name?.toLowerCase() || 'unknown';
+          const price = record.price || 0;
+          
+          if (!hourlyData[hour]) {
+            hourlyData[hour] = {};
+          }
+          
+          hourlyData[hour][marketplace] = price;
+        });
+      }
+      
+      // Get unique marketplaces for this card
+      const uniqueMarketplaces = getUniqueMarketplaces();
+      
+      // Get the last known prices to use for hours without data
+      const lastKnownPrices: { [marketplace: string]: number } = { average: 0 };
+      uniqueMarketplaces.forEach(marketplace => {
+        lastKnownPrices[marketplace] = 0;
+      });
+      
+      // Find the earliest record to get initial prices and sold_price_avg
+      const earliestRecord = cardHistoryData
+        .filter(r => r.date_fetched)
+        .sort((a, b) => new Date(a.date_fetched!).getTime() - new Date(b.date_fetched!).getTime())[0];
+      
+      if (earliestRecord) {
+        const marketplace = earliestRecord.marketplace_name?.toLowerCase() || 'unknown';
+        const price = earliestRecord.price || 0;
+        
+        // Set initial price for the marketplace
+        if (uniqueMarketplaces.includes(marketplace)) {
+          lastKnownPrices[marketplace] = price;
+        }
+        
+        // Use sold_price_avg from the database instead of calculating
+        lastKnownPrices.average = earliestRecord.sold_price_avg || 0;
+      }
+      
+      // Generate data points for each hour from 00:00 to current hour
+      for (let hour = 0; hour <= currentHour; hour++) {
+        const hourDate = new Date(baseDate);
+        hourDate.setHours(hour);
+        
+        // If we have data for this hour, use it
+        if (hourlyData[hour]) {
+          const hourData = hourlyData[hour];
+          
+          // Update last known prices with this hour's data for all marketplaces
+          uniqueMarketplaces.forEach(marketplace => {
+            if (hourData[marketplace]) {
+              lastKnownPrices[marketplace] = hourData[marketplace];
+            }
+          });
+          
+          // Find the record for this hour to get sold_price_avg
+          const hourRecord = todayRecords.find(record => {
+            if (!record.date_fetched) return false;
+            const recordDate = new Date(record.date_fetched);
+            return recordDate.getHours() === hour;
+          });
+          
+          // Use sold_price_avg from the database if available
+          if (hourRecord && hourRecord.sold_price_avg !== null) {
+            lastKnownPrices.average = hourRecord.sold_price_avg;
+          }
+        }
+        
+        // Create data point for this hour with all marketplace prices
+        const dataPoint: PriceData = {
+          date: hourDate.toISOString(),
+          average: lastKnownPrices.average,
+          isInflectionPoint: inflectionHours.includes(hour)
+        };
+        
+        // Add all marketplace prices to the data point
+        uniqueMarketplaces.forEach(marketplace => {
+          dataPoint[marketplace] = lastKnownPrices[marketplace];
+        });
+        
+        chartData.push(dataPoint);
+      }
+      
+      return chartData;
+    }
+    
+    // For other timeframes or if no today's data, use the regular approach
+    // Group data by date and marketplace, also track sold_price_avg
+    const groupedData: { [date: string]: { [marketplace: string]: number } } = {};
+    const avgSoldPriceByDate: { [date: string]: number } = {};
+    
+    cardHistoryData.forEach(record => {
+      if (!record.date_fetched) return; // Skip records without date
+      
+      const date = new Date(record.date_fetched).toISOString().split('T')[0]; // Get date only
+      const marketplace = record.marketplace_name?.toLowerCase() || 'unknown';
+      const price = record.price || 0;
+
+      if (!groupedData[date]) {
+        groupedData[date] = {};
+      }
+      
+      // Use the latest price for each marketplace on each date
+      groupedData[date][marketplace] = price;
+      
+      // Store sold_price_avg for this date (use the latest one if multiple records per day)
+      if (record.sold_price_avg !== null) {
+        avgSoldPriceByDate[date] = record.sold_price_avg;
+      }
+    });
+
+    // Get unique marketplaces for this card
+    const uniqueMarketplaces = getUniqueMarketplaces();
+    
+    // Convert to PriceData format
+    const chartData: PriceData[] = Object.keys(groupedData)
+      .sort()
+      .map(date => {
+        const dayData = groupedData[date];
+        
+        // Create data point with all marketplace prices
+        const dataPoint: PriceData = {
+          date: date,
+          average: 0,
+          isInflectionPoint: true // Mark all actual data points as inflection points
+        };
+        
+        // Add all marketplace prices to the data point
+        const marketplacePrices: number[] = [];
+        uniqueMarketplaces.forEach(marketplace => {
+          const price = dayData[marketplace] || 0;
+          dataPoint[marketplace] = price;
+          if (price > 0) {
+            marketplacePrices.push(price);
+          }
+        });
+        
+        // Use sold_price_avg from database if available, otherwise calculate from marketplace prices
+        let average = avgSoldPriceByDate[date];
+        if (average === undefined || average === null) {
+          average = marketplacePrices.length > 0 
+            ? marketplacePrices.reduce((sum, price) => sum + price, 0) / marketplacePrices.length 
+            : 0;
+        }
+        
+        dataPoint.average = Math.round(average * 100) / 100;
+        
+        return dataPoint;
+      });
+
+    // If there's only one data point, extend it to current time to show flat line
+    if (chartData.length === 1) {
+      const singlePoint = chartData[0];
+      const currentDate = new Date().toISOString().split('T')[0];
+      
+      // Add current date with same prices to show flat line
+      if (singlePoint.date !== currentDate) {
+        chartData.push({
+          date: currentDate,
+          ebay: singlePoint.ebay,
+          pwcc: singlePoint.pwcc,
+          comc: singlePoint.comc,
+          average: singlePoint.average,
+          isInflectionPoint: false // This is not an actual data point
+        });
+      }
+    }
+
+    return chartData;
+  };
+
+  // Get price data based on selected card and available data
+  const priceData: PriceData[] = selectedCard && cardHistoryData.length > 0
+    ? getCardPriceData()
+    : [];
+
+
 
   const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
 
@@ -263,6 +534,44 @@ export function Trends() {
     ) : (
       <TrendingDown className="h-4 w-4 text-red-600" />
     );
+  };
+
+  // Generate colors for marketplaces
+  const getMarketplaceColor = (marketplace: string, index: number): string => {
+    const colors = [
+      '#1f77b4', // blue
+      '#ff7f0e', // orange  
+      '#2ca02c', // green
+      '#d62728', // red
+      '#9467bd', // purple
+      '#8c564b', // brown
+      '#e377c2', // pink
+      '#7f7f7f', // gray
+      '#bcbd22', // olive
+      '#17becf'  // cyan
+    ];
+    
+    // Use consistent colors for known marketplaces
+    const marketplaceColors: { [key: string]: string } = {
+      'ebay': '#1f77b4',
+      'pwcc': '#ff7f0e', 
+      'comc': '#2ca02c',
+      'cardshq': '#d62728'
+    };
+    
+    return marketplaceColors[marketplace.toLowerCase()] || colors[index % colors.length];
+  };
+
+  // Get marketplace display name
+  const getMarketplaceDisplayName = (marketplace: string): string => {
+    const displayNames: { [key: string]: string } = {
+      'ebay': 'eBay',
+      'pwcc': 'PWCC',
+      'comc': 'COMC', 
+      'cardshq': 'CardsHQ'
+    };
+    
+    return displayNames[marketplace.toLowerCase()] || marketplace.charAt(0).toUpperCase() + marketplace.slice(1);
   };
 
   // Helper function to get selected search display text
@@ -459,26 +768,42 @@ export function Trends() {
             }
           </CardTitle>
           <CardDescription>
-            {selectedCard && selectedTimeframe
-              ? selectedTimeframe === 'today' 
-                ? 'Price trends across different marketplaces for today (hourly breakdown)'
-                : `Price trends across different marketplaces over the last ${selectedTimeframe} days`
-              : 'Select a saved search, card, and time period to view price trends'
+            {selectedCard && cardHistoryData.length > 0
+              ? `Historical price data for this card across different marketplaces. "Avg Sold Price" shows the actual average sold price from search results${cardHistoryData.length === 1 ? ' (single data point extended to current time)' : ''}`
+              : 'Select a saved search and card to view historical price trends from actual search data'
             }
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Legend for inflection points */}
+          {selectedTimeframe === 'today' && (
+            <div className="mb-4 text-sm text-muted-foreground flex items-center">
+              <div className="flex items-center mr-4">
+                <div className="w-3 h-3 rounded-full bg-blue-600 mr-1"></div>
+                <span>Dots on the chart indicate times when searches were performed based on the card's search schedule</span>
+              </div>
+            </div>
+          )}
+          
           <div className="h-96">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={priceData}>
+            {priceData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart 
+                  data={priceData}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="date" 
                   tickFormatter={(value) => {
                     const date = new Date(value);
-                    return selectedTimeframe === 'today' 
-                      ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                      : date.toLocaleDateString();
+                    // For real card data or historical data, show date format
+                    // For today's hourly data, show time format
+                    if (selectedTimeframe === 'today') {
+                      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    } else {
+                      return date.toLocaleDateString();
+                    }
                   }}
                 />
                 <YAxis 
@@ -488,49 +813,112 @@ export function Trends() {
                 <Tooltip 
                   labelFormatter={(value) => {
                     const date = new Date(value);
-                    return selectedTimeframe === 'today' 
-                      ? date.toLocaleString([], { 
-                          hour: '2-digit', 
-                          minute: '2-digit',
-                          month: 'short',
-                          day: 'numeric'
-                        })
-                      : date.toLocaleDateString();
+                    const dataPoint = priceData.find(p => p.date === value);
+                    const isInflection = dataPoint?.isInflectionPoint;
+                    
+                    let formattedDate = '';
+                    if (selectedTimeframe === 'today') {
+                      formattedDate = date.toLocaleString([], { 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        month: 'short',
+                        day: 'numeric'
+                      });
+                    } else {
+                      formattedDate = date.toLocaleDateString();
+                    }
+                    
+                    // Add indicator for search execution points
+                    return isInflection 
+                      ? `${formattedDate} 🔍 (Search executed)` 
+                      : formattedDate;
                   }}
-                  formatter={(value: number) => [formatCurrency(value), '']}
+                  formatter={(value: number, name: string) => {
+                    // Format the value as currency
+                    return [formatCurrency(value), name];
+                  }}
+                  contentStyle={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    padding: '8px'
+                  }}
                 />
                 <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="ebay" 
-                  stroke="#1f77b4" 
-                  strokeWidth={2}
-                  name="eBay"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="pwcc" 
-                  stroke="#ff7f0e" 
-                  strokeWidth={2}
-                  name="PWCC"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="comc" 
-                  stroke="#2ca02c" 
-                  strokeWidth={2}
-                  name="COMC"
-                />
+                
+                {/* Render lines dynamically for all marketplaces */}
+                {priceData.length > 0 && getUniqueMarketplaces().map((marketplace, index) => {
+                  const color = getMarketplaceColor(marketplace, index);
+                  const displayName = getMarketplaceDisplayName(marketplace);
+                  
+                  return (
+                    <Line 
+                      key={marketplace}
+                      type="monotone" 
+                      dataKey={marketplace} 
+                      stroke={color} 
+                      strokeWidth={2}
+                     name={displayName}
+                       dot={(props: any) => {
+                        const dataPoint = priceData[props.index];
+                        if (!dataPoint) return null;
+                        
+                        return dataPoint.isInflectionPoint ? (
+                          <circle 
+                            key={`${marketplace}-${props.index}`}
+                            cx={props.cx} 
+                            cy={props.cy} 
+                            r={4} 
+                            fill={color} 
+                            stroke="white" 
+                            strokeWidth={1} 
+                          />
+                        ) : null;
+                      }}
+                      activeDot={{ r: 6, fill: color, stroke: 'white', strokeWidth: 2 }}
+                    />
+                  );
+                })}
                 <Line 
                   type="monotone" 
                   dataKey="average" 
-                  stroke="#d62728" 
+                  stroke="#9467bd" 
                   strokeWidth={3}
                   strokeDasharray="5 5"
-                  name="Average"
+                  name="Avg Sold Price"
+                  dot={(props: any) => {
+                    const dataPoint = priceData[props.index];
+                    if (!dataPoint) return null;
+                    
+                    return dataPoint.isInflectionPoint ? (
+                      <circle 
+                        key={`average-${props.index}`}
+                        cx={props.cx} 
+                        cy={props.cy} 
+                        r={4} 
+                        fill="#9467bd" 
+                        stroke="white" 
+                        strokeWidth={1} 
+                      />
+                    ) : null;
+                  }}
+                  activeDot={{ r: 6, fill: '#9467bd', stroke: 'white', strokeWidth: 2 }}
                 />
-              </LineChart>
-            </ResponsiveContainer>
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <p className="text-lg text-muted-foreground mb-2">No price data available</p>
+                  <p className="text-sm text-muted-foreground">
+                    {!selectedCard 
+                      ? "Select a card to view price trends"
+                      : "No historical data found for this card"
+                    }
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
