@@ -156,7 +156,36 @@ export function Trends() {
           };
         }) || [];
         
-        setSearchResults(enhancedResults);
+        // Filter to only show cards that have duplicate card_id values
+        // Using the same logic as temp_card_id_finder.js
+        const groupedByCardId: { [key: string]: any[] } = {};
+        
+        // Group records by card_id (same logic as temp_card_id_finder.js)
+        enhancedResults.forEach(record => {
+          const cardId = record.card_id;
+          
+          // Skip records without card_id
+          if (!cardId) {
+            return;
+          }
+          
+          if (!groupedByCardId[cardId]) {
+            groupedByCardId[cardId] = [];
+          }
+          groupedByCardId[cardId].push(record);
+        });
+
+        // Filter to only include records where card_id appears more than once
+        const filteredResults: any[] = [];
+        
+        Object.keys(groupedByCardId).forEach(cardId => {
+          const group = groupedByCardId[cardId];
+          if (group.length > 1) {
+            filteredResults.push(...group);
+          }
+        });
+        
+        setSearchResults(filteredResults);
         
         // Don't auto-select cards - let user choose
         setSelectedCard(null);
