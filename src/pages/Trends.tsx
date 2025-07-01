@@ -270,6 +270,59 @@ export function Trends() {
       // Parse schedule information
       const schedule = selectedSearchData?.schedule || "hourly";
       
+      // Helper function to parse schedule and determine if it's greater than 24 hours
+      const parseScheduleInterval = (schedule: string): { intervalHours: number; isGreaterThan24Hours: boolean } => {
+        // Handle the specific schedule values used in the application
+        switch (schedule) {
+          case "10min":
+            return { intervalHours: 10/60, isGreaterThan24Hours: false }; // 10 minutes = 0.167 hours
+          case "15min":
+            return { intervalHours: 15/60, isGreaterThan24Hours: false }; // 15 minutes = 0.25 hours
+          case "1h":
+          case "hourly":
+            return { intervalHours: 1, isGreaterThan24Hours: false };
+          case "6h":
+            return { intervalHours: 6, isGreaterThan24Hours: false };
+          case "24h":
+          case "daily":
+            return { intervalHours: 24, isGreaterThan24Hours: true };
+          case "weekly":
+            return { intervalHours: 168, isGreaterThan24Hours: true }; // 7 * 24
+          case "manual":
+            return { intervalHours: 24, isGreaterThan24Hours: true }; // Treat manual as daily for chart purposes
+        }
+        
+        // Handle legacy or custom schedule formats
+        if (schedule.startsWith("every")) {
+          // Parse "every X hours", "every X days", "every X weeks" format
+          const hoursMatch = schedule.match(/every\s+(\d+)\s+hours?/i);
+          const daysMatch = schedule.match(/every\s+(\d+)\s+days?/i);
+          const weeksMatch = schedule.match(/every\s+(\d+)\s+weeks?/i);
+          
+          if (hoursMatch) {
+            const hours = parseInt(hoursMatch[1], 10);
+            return { intervalHours: hours, isGreaterThan24Hours: hours > 24 };
+          } else if (daysMatch) {
+            const days = parseInt(daysMatch[1], 10);
+            const hours = days * 24;
+            return { intervalHours: hours, isGreaterThan24Hours: true };
+          } else if (weeksMatch) {
+            const weeks = parseInt(weeksMatch[1], 10);
+            const hours = weeks * 168;
+            return { intervalHours: hours, isGreaterThan24Hours: true };
+          }
+        }
+        
+        // Default to every hour if parsing fails
+        return { intervalHours: 1, isGreaterThan24Hours: false };
+      };
+      
+      const { intervalHours, isGreaterThan24Hours } = parseScheduleInterval(schedule);
+      
+      // If schedule is greater than 24 hours, set timeline to 1 hour intervals
+      // For minute-based schedules, also use 1 hour intervals to avoid too many data points
+      const timelineInterval = isGreaterThan24Hours || intervalHours < 1 ? 1 : Math.ceil(intervalHours);
+      
       // Find the earliest record for today
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -286,42 +339,63 @@ export function Trends() {
       const getInflectionHours = (): number[] => {
         if (!searchCreatedAt) return [0, 6, 12, 18]; // Default inflection points
         
-        if (schedule === "hourly") {
-          // Every hour is an inflection point
-          return Array.from({ length: currentHour + 1 }, (_, i) => i);
-        } else if (schedule === "daily") {
-          // Just use the hour when the search was created
-          const creationHour = searchCreatedAt.getHours();
-          return [creationHour].filter(h => h <= currentHour);
-        } else if (schedule.startsWith("every")) {
-          // Parse "every X hours" format
-          const match = schedule.match(/every\s+(\d+)\s+hours?/i);
-          const interval = match ? parseInt(match[1], 10) : 4; // Default to 4 if parsing fails
+        if (isGreaterThan24Hours) {
+          // For schedules greater than 24 hours, use 1-hour timeline but mark actual search times
+          // Since the search runs less frequently than daily, we need to identify when it actually ran
+          const actualSearchHours: number[] = [];
           
-          // Calculate inflection points at regular intervals
-          const startHour = searchCreatedAt.getHours();
-          const points: number[] = [];
+          // Find actual search execution times from today's records
+          todayRecords.forEach(record => {
+            if (record.date_fetched) {
+              const recordDate = new Date(record.date_fetched);
+              const hour = recordDate.getHours();
+              if (!actualSearchHours.includes(hour)) {
+                actualSearchHours.push(hour);
+              }
+            }
+          });
           
-          // Start from the creation hour and add points at regular intervals
-          for (let h = startHour; h <= currentHour; h += interval) {
-            points.push(h);
-          }
-          
-          // Also add points from midnight at regular intervals
-          for (let h = 0; h < startHour; h += interval) {
-            if (!points.includes(h)) {
-              points.push(h);
+          // If no actual search times found, use the creation hour as fallback
+          if (actualSearchHours.length === 0 && searchCreatedAt) {
+            const creationHour = searchCreatedAt.getHours();
+            if (creationHour <= currentHour) {
+              actualSearchHours.push(creationHour);
             }
           }
           
-          // Sort the points
-          points.sort((a, b) => a - b);
+          return actualSearchHours.sort((a, b) => a - b);
+        } else {
+          // For sub-daily schedules, calculate inflection points based on interval
+          const startHour = searchCreatedAt ? searchCreatedAt.getHours() : 0;
+          const points: number[] = [];
           
-          return points;
+          // Handle minute-based schedules by converting to hours
+          let hourInterval = intervalHours;
+          if (intervalHours < 1) {
+            // For minute-based schedules (10min, 15min), calculate how many times per hour
+            const timesPerHour = Math.ceil(1 / intervalHours);
+            // Mark every hour that would have a search
+            for (let h = startHour; h <= currentHour; h++) {
+              points.push(h);
+            }
+          } else {
+            // For hour-based schedules
+            // Start from the creation hour and add points at regular intervals
+            for (let h = startHour; h <= currentHour; h += Math.ceil(hourInterval)) {
+              points.push(h);
+            }
+            
+            // Also add points from midnight at regular intervals
+            for (let h = 0; h < startHour; h += Math.ceil(hourInterval)) {
+              if (!points.includes(h)) {
+                points.push(h);
+              }
+            }
+          }
+          
+          // Sort the points and ensure they're within current hour
+          return points.filter(h => h <= currentHour).sort((a, b) => a - b);
         }
-        
-        // Default to every 4 hours
-        return [0, 4, 8, 12, 16, 20].filter(h => h <= currentHour);
       };
       
       const inflectionHours = getInflectionHours();
@@ -378,8 +452,9 @@ export function Trends() {
         lastKnownPrices.average = earliestRecord.sold_price_avg || 0;
       }
       
-      // Generate data points for each hour from 00:00 to current hour
-      for (let hour = 0; hour <= currentHour; hour++) {
+      // Generate data points based on timeline interval
+      // For schedules > 24 hours, use 1-hour intervals; otherwise use the schedule interval
+      for (let hour = 0; hour <= currentHour; hour += timelineInterval) {
         const hourDate = new Date(baseDate);
         hourDate.setHours(hour);
         
@@ -780,7 +855,46 @@ export function Trends() {
             <div className="mb-4 text-sm text-muted-foreground flex items-center">
               <div className="flex items-center mr-4">
                 <div className="w-3 h-3 rounded-full bg-blue-600 mr-1"></div>
-                <span>Dots on the chart indicate times when searches were performed based on the card's search schedule</span>
+                <span>
+                  Dots on the chart indicate times when searches were performed based on the card's search schedule
+                  {(() => {
+                    const cardResult = searchResults.find(r => r.id === selectedCard);
+                    const savedSearchId = cardResult?.saved_search_id;
+                    const selectedSearchData = savedSearchId 
+                      ? savedSearches.find(search => search.id === savedSearchId)
+                      : null;
+                    const schedule = selectedSearchData?.schedule || "hourly";
+                    
+                    // Check if schedule is greater than 24 hours using the same logic as the chart
+                    const parseScheduleInterval = (schedule: string): { intervalHours: number; isGreaterThan24Hours: boolean } => {
+                      switch (schedule) {
+                        case "10min":
+                          return { intervalHours: 10/60, isGreaterThan24Hours: false };
+                        case "15min":
+                          return { intervalHours: 15/60, isGreaterThan24Hours: false };
+                        case "1h":
+                        case "hourly":
+                          return { intervalHours: 1, isGreaterThan24Hours: false };
+                        case "6h":
+                          return { intervalHours: 6, isGreaterThan24Hours: false };
+                        case "24h":
+                        case "daily":
+                          return { intervalHours: 24, isGreaterThan24Hours: true };
+                        case "weekly":
+                          return { intervalHours: 168, isGreaterThan24Hours: true };
+                        case "manual":
+                          return { intervalHours: 24, isGreaterThan24Hours: true };
+                      }
+                      return { intervalHours: 1, isGreaterThan24Hours: false };
+                    };
+                    
+                    const { isGreaterThan24Hours } = parseScheduleInterval(schedule);
+                    
+                    return isGreaterThan24Hours 
+                      ? " (Timeline set to 1-hour intervals for schedules > 24 hours)"
+                      : "";
+                  })()}
+                </span>
               </div>
             </div>
           )}
