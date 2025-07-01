@@ -175,13 +175,21 @@ export function Trends() {
           groupedByCardId[cardId].push(record);
         });
 
-        // Filter to only include records where card_id appears more than once
+        // Filter to only include one representative record per card_id that has duplicates
         const filteredResults: any[] = [];
         
         Object.keys(groupedByCardId).forEach(cardId => {
           const group = groupedByCardId[cardId];
           if (group.length > 1) {
-            filteredResults.push(...group);
+            // Sort by date_fetched (most recent first) and take the first one as representative
+            const sortedGroup = group.sort((a, b) => new Date(b.date_fetched).getTime() - new Date(a.date_fetched).getTime());
+            const representative = {
+              ...sortedGroup[0],
+              // Add metadata about duplicates for potential future use
+              duplicate_count: group.length,
+              all_duplicates: group
+            };
+            filteredResults.push(representative);
           }
         });
         
@@ -829,7 +837,14 @@ export function Trends() {
                               )}
                             />
                             <div className="flex flex-col">
-                              <span>{result.card_name}</span>
+                              <div className="flex items-center gap-2">
+                                <span>{result.card_name}</span>
+                                {(result as any).duplicate_count && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    {(result as any).duplicate_count} records
+                                  </Badge>
+                                )}
+                              </div>
                               <span className="text-sm text-muted-foreground">
                                 {result.marketplace_name} - ${result.price?.toFixed(2) || 'N/A'}
                               </span>
