@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,7 +9,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
-import { CalendarIcon, Download, FileText, Table } from 'lucide-react';
+import { useTableNames } from '@/hooks/useTableNames';
+import { getFormattedTableFields, getAllAvailableFields } from '@/utils/getTableFields';
+import type { TableName } from '@/utils/extractTableNames';
+import { CalendarIcon, Download, FileText, Table, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 export function Exports() {
@@ -19,18 +22,32 @@ export function Exports() {
   const [includedFields, setIncludedFields] = useState<string[]>([]);
   const [fileName, setFileName] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [availableFields, setAvailableFields] = useState<string[]>([]);
   const { toast } = useToast();
+  const { tables, loading: tablesLoading, error: tablesError } = useTableNames();
 
-  const availableFields = [
-    'Card Name',
-    'Price',
-    'Marketplace',
-    'Date',
-    'Condition',
-    'Grade',
-    'Seller',
-    'Sale Type'
-  ];
+  // Update available fields when data source changes
+  useEffect(() => {
+    if (!dataSource) {
+      setAvailableFields([]);
+      setIncludedFields([]);
+      return;
+    }
+
+    let fields: string[] = [];
+    
+    if (dataSource === 'all-data') {
+      // For "all-data", show all unique fields from all tables
+      fields = getAllAvailableFields();
+    } else {
+      // For specific table, show only that table's fields
+      fields = getFormattedTableFields(dataSource as TableName);
+    }
+
+    setAvailableFields(fields);
+    // Clear previously selected fields when data source changes
+    setIncludedFields([]);
+  }, [dataSource]);
 
   const handleFieldToggle = (field: string) => {
     setIncludedFields(prev => 
@@ -38,6 +55,14 @@ export function Exports() {
         ? prev.filter(f => f !== field)
         : [...prev, field]
     );
+  };
+
+  const handleSelectAllFields = () => {
+    setIncludedFields([...availableFields]);
+  };
+
+  const handleClearAllFields = () => {
+    setIncludedFields([]);
   };
 
   const handleExport = async () => {
@@ -109,16 +134,27 @@ export function Exports() {
 
             <div className="space-y-2">
               <Label htmlFor="data-source">Data Source</Label>
-              <Select value={dataSource} onValueChange={setDataSource}>
+              <Select value={dataSource} onValueChange={setDataSource} disabled={tablesLoading}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select data to export" />
+                  <SelectValue placeholder={tablesLoading ? "Loading tables..." : "Select data to export"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="search-results">Search Results</SelectItem>
-                  <SelectItem value="price-history">Price History</SelectItem>
-                  <SelectItem value="alerts">Price Alerts</SelectItem>
-                  <SelectItem value="saved-searches">Saved Searches</SelectItem>
-                  <SelectItem value="all-data">All Data</SelectItem>
+                  {tablesLoading ? (
+                    <div className="flex items-center justify-center p-2">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Loading tables...
+                    </div>
+                  ) : tablesError ? (
+                    <div className="text-red-500 p-2 text-sm">
+                      Error loading tables: {tablesError}
+                    </div>
+                  ) : (
+                    tables.map((table) => (
+                      <SelectItem key={table.value} value={table.value}>
+                        {table.label}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -181,20 +217,51 @@ export function Exports() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {availableFields.map((field) => (
-                <div key={field} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={field}
-                    checked={includedFields.includes(field)}
-                    onCheckedChange={() => handleFieldToggle(field)}
-                  />
-                  <Label htmlFor={field} className="text-sm font-normal">
-                    {field}
-                  </Label>
+            {!dataSource ? (
+              <div className="text-center py-8 text-gray-500">
+                <Table className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>Please select a data source first to see available fields</p>
+              </div>
+            ) : availableFields.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No fields available for the selected data source</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSelectAllFields}
+                    disabled={includedFields.length === availableFields.length}
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleClearAllFields}
+                    disabled={includedFields.length === 0}
+                  >
+                    Clear All
+                  </Button>
                 </div>
-              ))}
-            </div>
+                <div className="space-y-3">
+                  {availableFields.map((field) => (
+                    <div key={field} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={field}
+                        checked={includedFields.includes(field)}
+                        onCheckedChange={() => handleFieldToggle(field)}
+                      />
+                      <Label htmlFor={field} className="text-sm font-normal">
+                        {field}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
