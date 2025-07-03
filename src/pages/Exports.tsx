@@ -279,11 +279,14 @@ export function Exports() {
               // Add table name to each record for identification
               const dataWithTableName = tableData.map(row => {
                 // Ensure row is an object before spreading
-                if (row && typeof row === 'object' && !Array.isArray(row)) {
-                  return {
-                    ...row,
-                    source_table: table.label
-                  };
+                if (row && typeof row === 'object') {
+                  if (!Array.isArray(row)) {
+                    // @ts-ignore
+                    return {
+                      ...row,
+                      source_table: table.label
+                    };
+                  }
                 }
                 // Fallback for non-object rows
                 return {
