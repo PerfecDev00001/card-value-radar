@@ -10,10 +10,11 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { useTableNames } from '@/hooks/useTableNames';
-import { getFormattedTableFields, getAllAvailableFields } from '@/utils/getTableFields';
+import { getFormattedTableFields, getAllAvailableFields, getTableFields } from '@/utils/getTableFields';
 import type { TableName } from '@/utils/extractTableNames';
 import { CalendarIcon, Download, FileText, Table, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 export function Exports() {
   const [exportType, setExportType] = useState('');
@@ -23,14 +24,69 @@ export function Exports() {
   const [fileName, setFileName] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [availableFields, setAvailableFields] = useState<string[]>([]);
+  const [rowCount, setRowCount] = useState<number | null>(null);
+  const [loadingRowCount, setLoadingRowCount] = useState(false);
   const { toast } = useToast();
   const { tables, loading: tablesLoading, error: tablesError } = useTableNames();
 
-  // Update available fields when data source changes
+  // Function to fetch row count for a specific table
+  const fetchRowCount = async (tableName: string) => {
+    if (tableName === 'all-data') {
+      setLoadingRowCount(true);
+      try {
+        // For "all-data", we need to sum up all tables
+        let totalCount = 0;
+        for (const table of tables) {
+          if (table.value !== 'all-data') {
+            try {
+              const { count, error } = await supabase
+                .from(table.value as TableName)
+                .select('*', { count: 'exact', head: true });
+              
+              if (!error && count !== null) {
+                totalCount += count;
+              }
+            } catch (err) {
+              // Skip tables that can't be counted
+              console.log(`Could not count rows for table ${table.value}:`, err);
+            }
+          }
+        }
+        setRowCount(totalCount);
+      } catch (error) {
+        console.error('Error fetching total row count:', error);
+        setRowCount(null);
+      } finally {
+        setLoadingRowCount(false);
+      }
+    } else {
+      setLoadingRowCount(true);
+      try {
+        const { count, error } = await supabase
+          .from(tableName as TableName)
+          .select('*', { count: 'exact', head: true });
+        
+        if (error) {
+          console.error('Error fetching row count:', error);
+          setRowCount(null);
+        } else {
+          setRowCount(count);
+        }
+      } catch (error) {
+        console.error('Error fetching row count:', error);
+        setRowCount(null);
+      } finally {
+        setLoadingRowCount(false);
+      }
+    }
+  };
+
+  // Update available fields and row count when data source changes
   useEffect(() => {
     if (!dataSource) {
       setAvailableFields([]);
       setIncludedFields([]);
+      setRowCount(null);
       return;
     }
 
@@ -47,7 +103,10 @@ export function Exports() {
     setAvailableFields(fields);
     // Clear previously selected fields when data source changes
     setIncludedFields([]);
-  }, [dataSource]);
+    
+    // Fetch row count for the selected data source
+    fetchRowCount(dataSource);
+  }, [dataSource, tables]);
 
   const handleFieldToggle = (field: string) => {
     setIncludedFields(prev => 
@@ -65,6 +124,130 @@ export function Exports() {
     setIncludedFields([]);
   };
 
+  // Helper function to convert formatted field names back to database field names
+  const convertToDbFieldName = (formattedField: string): string => {
+    return formattedField.toLowerCase().replace(/\s+/g, '_');
+  };
+
+  // Helper function to fetch data from a single table
+  const fetchTableData = async (tableName: TableName, fields: string[]) => {
+    const dbFields = fields.map(convertToDbFieldName);
+    let query = supabase.from(tableName).select(dbFields.join(','));
+
+    // Apply date range filter if specified
+    if (dateRange.from || dateRange.to) {
+      // Try to find a date field in the table (common date field names)
+      const dateFields = ['created_at', 'updated_at', 'timestamp', 'date_fetched', 'fetched_at', 'sent_at'];
+      const availableDbFields = getTableFields(tableName);
+      const dateField = dateFields.find(field => availableDbFields.includes(field));
+
+      if (dateField) {
+        if (dateRange.from) {
+          query = query.gte(dateField, dateRange.from.toISOString());
+        }
+        if (dateRange.to) {
+          query = query.lte(dateField, dateRange.to.toISOString());
+        }
+      }
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  };
+
+  // Helper function to generate CSV content
+  const generateCSV = (data: any[], fields: string[]): string => {
+    if (data.length === 0) return '';
+
+    const dbFields = fields.map(convertToDbFieldName);
+    const headers = fields.join(',');
+    const rows = data.map(row => 
+      dbFields.map(field => {
+        const value = row[field];
+        // Handle null/undefined values and escape commas/quotes
+        if (value === null || value === undefined) return '';
+        const stringValue = String(value);
+        // Escape quotes and wrap in quotes if contains comma, quote, or newline
+        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+          return `"${stringValue.replace(/"/g, '""')}"`;
+        }
+        return stringValue;
+      }).join(',')
+    );
+
+    return [headers, ...rows].join('\n');
+  };
+
+  // Helper function to generate JSON content
+  const generateJSON = (data: any[], fields: string[]): string => {
+    const dbFields = fields.map(convertToDbFieldName);
+    const filteredData = data.map(row => {
+      const filteredRow: any = {};
+      dbFields.forEach((field, index) => {
+        filteredRow[fields[index]] = row[field];
+      });
+      return filteredRow;
+    });
+
+    return JSON.stringify(filteredData, null, 2);
+  };
+
+  // Helper function to generate PDF content (simplified HTML for PDF generation)
+  const generatePDF = (data: any[], fields: string[], tableName: string): string => {
+    const dbFields = fields.map(convertToDbFieldName);
+    const tableRows = data.map(row => 
+      `<tr>${dbFields.map(field => `<td>${row[field] || ''}</td>`).join('')}</tr>`
+    ).join('');
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Export Report - ${tableName}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { color: #333; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .summary { margin-bottom: 20px; padding: 10px; background-color: #f0f8ff; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Export Report: ${tableName}</h1>
+    <div class="summary">
+        <p><strong>Export Date:</strong> ${new Date().toLocaleDateString()}</p>
+        <p><strong>Total Records:</strong> ${data.length}</p>
+        <p><strong>Fields Included:</strong> ${fields.join(', ')}</p>
+        ${dateRange.from || dateRange.to ? `<p><strong>Date Range:</strong> ${dateRange.from ? format(dateRange.from, "PPP") : 'Start'} - ${dateRange.to ? format(dateRange.to, "PPP") : 'End'}</p>` : ''}
+    </div>
+    <table>
+        <thead>
+            <tr>${fields.map(field => `<th>${field}</th>`).join('')}</tr>
+        </thead>
+        <tbody>
+            ${tableRows}
+        </tbody>
+    </table>
+</body>
+</html>`;
+  };
+
+  // Helper function to trigger file download
+  const downloadFile = (content: string, filename: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleExport = async () => {
     if (!exportType || !dataSource || includedFields.length === 0) {
       toast({
@@ -78,20 +261,100 @@ export function Exports() {
     setIsGenerating(true);
     
     try {
-      // Simulate export generation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      let allData: any[] = [];
+      let exportFileName = fileName || `export-${Date.now()}`;
+
+      if (dataSource === 'all-data') {
+        // Export from all tables
+        const allTables = tables.filter(table => table.value !== 'all-data');
+        
+        for (const table of allTables) {
+          try {
+            // Only include fields that exist in this table
+            const tableFields = getFormattedTableFields(table.value as TableName);
+            const relevantFields = includedFields.filter(field => tableFields.includes(field));
+            
+            if (relevantFields.length > 0) {
+              const tableData = await fetchTableData(table.value as TableName, relevantFields);
+              // Add table name to each record for identification
+              const dataWithTableName = tableData.map(row => {
+                // Ensure row is an object before spreading
+                if (row && typeof row === 'object' && !Array.isArray(row)) {
+                  return {
+                    ...row,
+                    source_table: table.label
+                  };
+                }
+                // Fallback for non-object rows
+                return {
+                  data: row,
+                  source_table: table.label
+                };
+              });
+              allData.push(...dataWithTableName);
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch data from table ${table.value}:`, error);
+          }
+        }
+
+        // Add source_table to included fields if not already present
+        if (!includedFields.includes('Source Table')) {
+          includedFields.push('Source Table');
+        }
+      } else {
+        // Export from single table
+        allData = await fetchTableData(dataSource as TableName, includedFields);
+      }
+
+      if (allData.length === 0) {
+        toast({
+          title: "No Data Found",
+          description: "No data was found matching your criteria.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Generate file content based on export type
+      let fileContent: string;
+      let mimeType: string;
+      let fileExtension: string;
+
+      switch (exportType) {
+        case 'csv':
+          fileContent = generateCSV(allData, includedFields);
+          mimeType = 'text/csv';
+          fileExtension = 'csv';
+          break;
+        case 'json':
+          fileContent = generateJSON(allData, includedFields);
+          mimeType = 'application/json';
+          fileExtension = 'json';
+          break;
+        case 'pdf':
+          fileContent = generatePDF(allData, includedFields, dataSource === 'all-data' ? 'All Data' : dataSource);
+          mimeType = 'text/html'; // We're generating HTML for PDF
+          fileExtension = 'html';
+          break;
+        default:
+          throw new Error('Unsupported export type');
+      }
+
+      // Download the file
+      const fullFileName = `${exportFileName}.${fileExtension}`;
+      downloadFile(fileContent, fullFileName, mimeType);
+
       toast({
         title: "Export Generated",
-        description: `${exportType.toUpperCase()} file has been generated and will download shortly.`,
+        description: `${exportType.toUpperCase()} file "${fullFileName}" has been downloaded successfully. ${allData.length} records exported.`,
       });
 
-      // In a real app, you would trigger the actual file download here
-      console.log('Export generated:', { exportType, dataSource, dateRange, includedFields, fileName });
     } catch (error) {
+      console.error('Export error:', error);
       toast({
         title: "Export Failed",
-        description: "There was an error generating your export. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error generating your export. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -285,8 +548,16 @@ export function Exports() {
               <div className="text-sm text-gray-600">Fields selected</div>
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">∞</div>
-              <div className="text-sm text-gray-600">Records available</div>
+              <div className="text-2xl font-bold text-purple-600">
+                {loadingRowCount ? (
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                ) : rowCount !== null ? (
+                  rowCount.toLocaleString()
+                ) : (
+                  '—'
+                )}
+              </div>
+              <div className="text-sm text-gray-600">All Rows</div>
             </div>
           </div>
           
@@ -310,45 +581,7 @@ export function Exports() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Recent Exports
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div>
-                <div className="font-medium">Search Results Export</div>
-                <div className="text-sm text-gray-600">CSV • 1,245 records • 2 hours ago</div>
-              </div>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div>
-                <div className="font-medium">Price History Report</div>
-                <div className="text-sm text-gray-600">PDF • 30 days • Yesterday</div>
-              </div>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div>
-                <div className="font-medium">All Data Backup</div>
-                <div className="text-sm text-gray-600">JSON • Complete dataset • 3 days ago</div>
-              </div>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+
     </div>
   );
 }
