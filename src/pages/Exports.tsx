@@ -282,6 +282,7 @@ export function Exports() {
                 if (row && typeof row === 'object') {
                   if (!Array.isArray(row)) {
                     // @ts-ignore
+                    // @ts-ignore
                     return {
                       ...row,
                       source_table: table.label
